@@ -1285,7 +1285,7 @@ function initExtractorController() {
             resultAudio.classList.add("hidden");
           }
           saveBtn?.classList.add("hidden");
-          if (resultDetails) resultDetails.textContent = "Saved to Mori Music library · " + formatBytes(result.size || 0) + " · M4A (original AAC stream, no re-encoding)";
+          if (resultDetails) resultDetails.textContent = "Saved to Mori Music library · " + (result.durationUs ? formatTimestamp(result.durationUs / 1000000) + " · " : "") + formatBytes(result.size || 0) + " · M4A (original AAC stream, no re-encoding)";
           resultCard?.classList.remove("hidden");
           showToast("Audio extracted and saved to Mori library.");
         } else if (!result?.cancelled) {
@@ -1345,7 +1345,7 @@ function initExtractorController() {
       muteVideoBtn.disabled = false;
       muteVideoLoader?.classList.add("hidden");
       if (result?.success) {
-        const message = "Saved " + (result.fileName || "silent video") + " to Downloads/Mori/Silent Videos";
+        const message = "Saved " + (result.fileName || "silent video") + " to Movies/Mori/Silent Videos";
         if (muteVideoResult) {
           muteVideoResult.textContent = message;
           muteVideoResult.classList.remove("hidden");
