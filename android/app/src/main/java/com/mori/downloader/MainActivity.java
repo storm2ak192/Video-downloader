@@ -126,6 +126,7 @@ public class MainActivity extends BridgeActivity {
     private String pendingFolderCallbackId = null;
     private String pendingSilentVideoCallbackId = null;
     private String pendingNativeAudioCallbackId = null;
+    private androidx.media3.transformer.Transformer activeAudioTransformer = null;
 
     private void sendFolderCallback(String callbackId, String path) {
         mainHandler.post(() -> {
@@ -258,70 +259,81 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
-    // Copies the already-encoded AAC stream into an M4A container using bounded buffers.
-    // No PCM decoding and no whole-file byte array are created.
+    // Media3 Transformer decodes supported source codecs and encodes AAC when needed.
+    // Processing is asynchronous and uses codec-sized buffers; the complete source is never loaded into RAM.
+    @androidx.media3.common.util.UnstableApi
     private void extractAudioTrackToLibrary(Uri sourceUri, String callbackId) {
-        File tempFile = new File(getCacheDir(), "mori_audio_" + System.currentTimeMillis() + ".m4a");
-        MediaExtractor extractor = new MediaExtractor();
-        MediaMuxer muxer = null;
-        boolean muxerStarted = false;
+        final File tempFile = new File(getCacheDir(), "mori_audio_" + System.currentTimeMillis() + ".mp4");
+        mainHandler.post(() -> {
+            try {
+                androidx.media3.common.MediaItem mediaItem =
+                    androidx.media3.common.MediaItem.fromUri(sourceUri);
+                androidx.media3.transformer.EditedMediaItem editedItem =
+                    new androidx.media3.transformer.EditedMediaItem.Builder(mediaItem)
+                        .setRemoveVideo(true)
+                        .build();
+
+                androidx.media3.transformer.Transformer.Listener listener =
+                    new androidx.media3.transformer.Transformer.Listener() {
+                        @Override
+                        public void onCompleted(
+                            androidx.media3.transformer.Composition composition,
+                            androidx.media3.transformer.ExportResult exportResult
+                        ) {
+                            activeAudioTransformer = null;
+                            executor.execute(() ->
+                                saveTransformedAudioToLibrary(tempFile, exportResult.durationMs, callbackId)
+                            );
+                        }
+
+                        @Override
+                        public void onError(
+                            androidx.media3.transformer.Composition composition,
+                            androidx.media3.transformer.ExportResult exportResult,
+                            androidx.media3.transformer.ExportException exportException
+                        ) {
+                            activeAudioTransformer = null;
+                            if (tempFile.exists()) tempFile.delete();
+                            JSONObject errorResult = new JSONObject();
+                            try {
+                                errorResult.put("success", false);
+                                errorResult.put("error",
+                                    exportException.getMessage() != null
+                                        ? exportException.getMessage()
+                                        : "This audio codec or container is not supported by the Android media decoders.");
+                            } catch (Exception ignored) {}
+                            sendNativeAudioCallback(callbackId, errorResult);
+                            Log.e("MoriMain", "Media3 audio extraction failed", exportException);
+                        }
+                    };
+
+                activeAudioTransformer =
+                    new androidx.media3.transformer.Transformer.Builder(this)
+                        .setAudioMimeType(androidx.media3.common.MimeTypes.AUDIO_AAC)
+                        .addListener(listener)
+                        .build();
+                activeAudioTransformer.start(editedItem, tempFile.getAbsolutePath());
+            } catch (Throwable error) {
+                if (tempFile.exists()) tempFile.delete();
+                JSONObject errorResult = new JSONObject();
+                try {
+                    errorResult.put("success", false);
+                    errorResult.put("error", error.getMessage() != null
+                        ? error.getMessage() : "Unable to process this audio format.");
+                } catch (Exception ignored) {}
+                sendNativeAudioCallback(callbackId, errorResult);
+                Log.e("MoriMain", "Could not start Media3 audio extraction", error);
+            }
+        });
+    }
+
+    private void saveTransformedAudioToLibrary(File tempFile, long durationMs, String callbackId) {
         Uri pendingDestination = null;
         JSONObject result = new JSONObject();
         try {
-            extractor.setDataSource(this, sourceUri, null);
-            int audioTrack = -1;
-            MediaFormat audioFormat = null;
-            for (int i = 0; i < extractor.getTrackCount(); i++) {
-                MediaFormat format = extractor.getTrackFormat(i);
-                String mime = format.getString(MediaFormat.KEY_MIME);
-                if (mime != null && mime.startsWith("audio/")) {
-                    audioTrack = i;
-                    audioFormat = format;
-                    break;
-                }
+            if (!tempFile.exists() || tempFile.length() <= 0) {
+                throw new IllegalStateException("Audio processing produced an empty file.");
             }
-            if (audioTrack < 0 || audioFormat == null) {
-                throw new IllegalArgumentException("No audio track was found in this video.");
-            }
-            String mime = audioFormat.getString(MediaFormat.KEY_MIME);
-            if (!"audio/mp4a-latm".equalsIgnoreCase(mime)) {
-                throw new IllegalArgumentException("This audio codec cannot be copied directly to M4A on this Android device. AAC audio is supported without re-encoding.");
-            }
-
-            muxer = new MediaMuxer(tempFile.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-            int outputTrack = muxer.addTrack(audioFormat);
-            extractor.selectTrack(audioTrack);
-            muxer.start();
-            muxerStarted = true;
-
-            int capacity = audioFormat.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)
-                ? audioFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) : 1024 * 1024;
-            capacity = Math.max(256 * 1024, Math.min(capacity, 8 * 1024 * 1024));
-            ByteBuffer sampleBuffer = ByteBuffer.allocateDirect(capacity);
-            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-            long samplesWritten = 0;
-            while (true) {
-                sampleBuffer.clear();
-                int sampleSize = extractor.readSampleData(sampleBuffer, 0);
-                if (sampleSize < 0) break;
-                if (sampleSize > sampleBuffer.capacity()) {
-                    if (sampleSize > 16 * 1024 * 1024) {
-                        throw new IllegalArgumentException("An audio sample is too large for safe on-device processing.");
-                    }
-                    sampleBuffer = ByteBuffer.allocateDirect(sampleSize);
-                    sampleSize = extractor.readSampleData(sampleBuffer, 0);
-                    if (sampleSize < 0) break;
-                }
-                info.set(0, sampleSize, extractor.getSampleTime(), extractor.getSampleFlags());
-                muxer.writeSampleData(outputTrack, sampleBuffer, info);
-                samplesWritten++;
-                if (!extractor.advance()) break;
-            }
-            if (samplesWritten == 0) throw new IllegalArgumentException("The selected video contains no readable audio samples.");
-            muxer.stop();
-            muxerStarted = false;
-            muxer.release();
-            muxer = null;
 
             String outputName = "Mori_Audio_" + System.currentTimeMillis() + ".m4a";
             String savedLocation;
@@ -369,22 +381,19 @@ public class MainActivity extends BridgeActivity {
             result.put("location", savedLocation);
             result.put("uri", savedUri != null ? savedUri.toString() : savedLocation);
             result.put("size", tempFile.length());
-            if (audioFormat.containsKey(MediaFormat.KEY_DURATION)) result.put("durationUs", audioFormat.getLong(MediaFormat.KEY_DURATION));
+            if (durationMs > 0) result.put("durationUs", durationMs * 1000L);
+            result.put("outputMime", "audio/mp4");
+            result.put("encoding", "AAC");
         } catch (Throwable error) {
-            Log.e("MoriMain", "Could not extract audio track", error);
+            Log.e("MoriMain", "Could not save extracted audio", error);
             try {
                 result.put("success", false);
-                result.put("error", error.getMessage() != null ? error.getMessage() : "Unsupported audio format.");
+                result.put("error", error.getMessage() != null ? error.getMessage() : "Could not save extracted audio.");
             } catch (Exception ignored) {}
         } finally {
             if (pendingDestination != null) {
                 try { getContentResolver().delete(pendingDestination, null, null); } catch (Exception ignored) {}
             }
-            if (muxer != null) {
-                try { if (muxerStarted) muxer.stop(); } catch (Exception ignored) {}
-                try { muxer.release(); } catch (Exception ignored) {}
-            }
-            try { extractor.release(); } catch (Exception ignored) {}
             if (tempFile.exists()) tempFile.delete();
         }
         sendNativeAudioCallback(callbackId, result);
