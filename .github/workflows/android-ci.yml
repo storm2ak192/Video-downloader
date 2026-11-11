@@ -6,6 +6,7 @@ on:
     paths:
       - "android/**"
       - "public/**"
+      - "third_party/**"
       - "package.json"
       - "package-lock.json"
       - "capacitor.config.*"
@@ -41,6 +42,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Install JavaScript dependencies
         run: npm ci
