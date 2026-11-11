@@ -245,7 +245,7 @@ public class MainActivity extends BridgeActivity {
                 WebView webView = getBridge() != null ? getBridge().getWebView() : null;
                 if (webView != null) {
                     String id = JSONObject.quote(callbackId);
-                    String payload = result != null ? result.toString() : "{\\"success\\":false,\\"error\\":\\"Unknown error\\"}";
+                    String payload = result != null ? result.toString() : "{\"success\":false,\"error\":\"Unknown error\"}";
                     webView.evaluateJavascript(
                         "(function(){var c=window.__moriNativeAudioCallbacks&&window.__moriNativeAudioCallbacks[" + id + "];" +
                         "if(c){delete window.__moriNativeAudioCallbacks[" + id + "];c(" + JSONObject.quote(payload) + ");}})();",
