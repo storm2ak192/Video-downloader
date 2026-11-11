@@ -1249,7 +1249,6 @@ function initExtractorController() {
     runBtn.disabled = true;
     loader?.classList.remove("hidden");
 
-    try {
     if (window.MoriMainBridge?.pickAudioTrack && window.Capacitor?.isNativePlatform?.()) {
       window.__moriNativeAudioCallbacks = window.__moriNativeAudioCallbacks || {};
       const callbackId = "native_audio_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
@@ -1296,6 +1295,7 @@ function initExtractorController() {
       return;
     }
 
+    try {
       const res = await extractAudioFromVideoFile(selectedVideoFile, {
         channels: selectedChannels,
       });
