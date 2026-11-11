@@ -125,6 +125,7 @@ public class MainActivity extends BridgeActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private String pendingFolderCallbackId = null;
     private String pendingSilentVideoCallbackId = null;
+    private String pendingNativeAudioCallbackId = null;
 
     private void sendFolderCallback(String callbackId, String path) {
         mainHandler.post(() -> {
@@ -186,6 +187,19 @@ public class MainActivity extends BridgeActivity {
             }
             return;
         }
+        if (requestCode == 203) {
+            final String callbackId = pendingNativeAudioCallbackId;
+            pendingNativeAudioCallbackId = null;
+            if (resultCode == RESULT_OK && data != null && data.getData() != null && callbackId != null) {
+                final Uri selectedUri = data.getData();
+                executor.execute(() -> extractAudioTrackToLibrary(selectedUri, callbackId));
+            } else if (callbackId != null) {
+                JSONObject result = new JSONObject();
+                try { result.put("success", false); result.put("cancelled", true); } catch (Exception ignored) {}
+                sendNativeAudioCallback(callbackId, result);
+            }
+            return;
+        }
         if (requestCode == 201) {
             String selectedPath = "";
             if (resultCode == RESULT_OK && data != null && data.getData() != null) {
@@ -223,6 +237,157 @@ public class MainActivity extends BridgeActivity {
                 Log.e("MoriMain", "Silent video callback error", e);
             }
         });
+    }
+
+    private void sendNativeAudioCallback(String callbackId, JSONObject result) {
+        mainHandler.post(() -> {
+            try {
+                WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+                if (webView != null) {
+                    String id = JSONObject.quote(callbackId);
+                    String payload = result != null ? result.toString() : "{\\"success\\":false,\\"error\\":\\"Unknown error\\"}";
+                    webView.evaluateJavascript(
+                        "(function(){var c=window.__moriNativeAudioCallbacks&&window.__moriNativeAudioCallbacks[" + id + "];" +
+                        "if(c){delete window.__moriNativeAudioCallbacks[" + id + "];c(" + JSONObject.quote(payload) + ");}})();",
+                        null
+                    );
+                }
+            } catch (Exception e) {
+                Log.e("MoriMain", "Native audio callback error", e);
+            }
+        });
+    }
+
+    // Copies the already-encoded AAC stream into an M4A container using bounded buffers.
+    // No PCM decoding and no whole-file byte array are created.
+    private void extractAudioTrackToLibrary(Uri sourceUri, String callbackId) {
+        File tempFile = new File(getCacheDir(), "mori_audio_" + System.currentTimeMillis() + ".m4a");
+        MediaExtractor extractor = new MediaExtractor();
+        MediaMuxer muxer = null;
+        boolean muxerStarted = false;
+        Uri pendingDestination = null;
+        JSONObject result = new JSONObject();
+        try {
+            extractor.setDataSource(this, sourceUri, null);
+            int audioTrack = -1;
+            MediaFormat audioFormat = null;
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(MediaFormat.KEY_MIME);
+                if (mime != null && mime.startsWith("audio/")) {
+                    audioTrack = i;
+                    audioFormat = format;
+                    break;
+                }
+            }
+            if (audioTrack < 0 || audioFormat == null) {
+                throw new IllegalArgumentException("No audio track was found in this video.");
+            }
+            String mime = audioFormat.getString(MediaFormat.KEY_MIME);
+            if (!"audio/mp4a-latm".equalsIgnoreCase(mime)) {
+                throw new IllegalArgumentException("This audio codec cannot be copied directly to M4A on this Android device. AAC audio is supported without re-encoding.");
+            }
+
+            muxer = new MediaMuxer(tempFile.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            int outputTrack = muxer.addTrack(audioFormat);
+            extractor.selectTrack(audioTrack);
+            muxer.start();
+            muxerStarted = true;
+
+            int capacity = audioFormat.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)
+                ? audioFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) : 1024 * 1024;
+            capacity = Math.max(256 * 1024, Math.min(capacity, 8 * 1024 * 1024));
+            ByteBuffer sampleBuffer = ByteBuffer.allocateDirect(capacity);
+            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+            long samplesWritten = 0;
+            while (true) {
+                sampleBuffer.clear();
+                int sampleSize = extractor.readSampleData(sampleBuffer, 0);
+                if (sampleSize < 0) break;
+                if (sampleSize > sampleBuffer.capacity()) {
+                    if (sampleSize > 16 * 1024 * 1024) {
+                        throw new IllegalArgumentException("An audio sample is too large for safe on-device processing.");
+                    }
+                    sampleBuffer = ByteBuffer.allocateDirect(sampleSize);
+                    sampleSize = extractor.readSampleData(sampleBuffer, 0);
+                    if (sampleSize < 0) break;
+                }
+                info.set(0, sampleSize, extractor.getSampleTime(), extractor.getSampleFlags());
+                muxer.writeSampleData(outputTrack, sampleBuffer, info);
+                samplesWritten++;
+                if (!extractor.advance()) break;
+            }
+            if (samplesWritten == 0) throw new IllegalArgumentException("The selected video contains no readable audio samples.");
+            muxer.stop();
+            muxerStarted = false;
+            muxer.release();
+            muxer = null;
+
+            String outputName = "Mori_Audio_" + System.currentTimeMillis() + ".m4a";
+            String savedLocation;
+            Uri savedUri = null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Audio.Media.DISPLAY_NAME, outputName);
+                values.put(MediaStore.Audio.Media.MIME_TYPE, "audio/mp4");
+                values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/Mori");
+                values.put(MediaStore.Audio.Media.IS_PENDING, 1);
+                savedUri = getContentResolver().insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
+                if (savedUri == null) throw new IllegalStateException("Could not create the audio file in Music/Mori.");
+                pendingDestination = savedUri;
+                try (InputStream in = new java.io.FileInputStream(tempFile);
+                     java.io.OutputStream out = getContentResolver().openOutputStream(savedUri, "w")) {
+                    if (out == null) throw new IllegalStateException("Could not open the audio destination.");
+                    byte[] copyBuffer = new byte[64 * 1024];
+                    int count;
+                    while ((count = in.read(copyBuffer)) != -1) out.write(copyBuffer, 0, count);
+                    out.flush();
+                }
+                ContentValues ready = new ContentValues();
+                ready.put(MediaStore.Audio.Media.IS_PENDING, 0);
+                getContentResolver().update(savedUri, ready, null, null);
+                pendingDestination = null;
+                savedLocation = savedUri.toString();
+            } else {
+                File base = getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+                if (base == null) base = getFilesDir();
+                File folder = new File(base, "Mori");
+                if (!folder.exists() && !folder.mkdirs()) throw new IllegalStateException("Could not create the Mori music folder.");
+                File destination = new File(folder, outputName);
+                try (InputStream in = new java.io.FileInputStream(tempFile);
+                     java.io.OutputStream out = new java.io.FileOutputStream(destination)) {
+                    byte[] copyBuffer = new byte[64 * 1024];
+                    int count;
+                    while ((count = in.read(copyBuffer)) != -1) out.write(copyBuffer, 0, count);
+                    out.flush();
+                }
+                savedLocation = destination.getAbsolutePath();
+                MediaScannerConnection.scanFile(this, new String[]{savedLocation}, new String[]{"audio/mp4"}, null);
+            }
+            result.put("success", true);
+            result.put("fileName", outputName);
+            result.put("location", savedLocation);
+            result.put("uri", savedUri != null ? savedUri.toString() : savedLocation);
+            result.put("size", tempFile.length());
+            if (audioFormat.containsKey(MediaFormat.KEY_DURATION)) result.put("durationUs", audioFormat.getLong(MediaFormat.KEY_DURATION));
+        } catch (Throwable error) {
+            Log.e("MoriMain", "Could not extract audio track", error);
+            try {
+                result.put("success", false);
+                result.put("error", error.getMessage() != null ? error.getMessage() : "Unsupported audio format.");
+            } catch (Exception ignored) {}
+        } finally {
+            if (pendingDestination != null) {
+                try { getContentResolver().delete(pendingDestination, null, null); } catch (Exception ignored) {}
+            }
+            if (muxer != null) {
+                try { if (muxerStarted) muxer.stop(); } catch (Exception ignored) {}
+                try { muxer.release(); } catch (Exception ignored) {}
+            }
+            try { extractor.release(); } catch (Exception ignored) {}
+            if (tempFile.exists()) tempFile.delete();
+        }
+        sendNativeAudioCallback(callbackId, result);
     }
 
     private void removeAudioTrackFromVideo(Uri sourceUri, String callbackId) {
@@ -350,6 +515,26 @@ public class MainActivity extends BridgeActivity {
     }
 
     public class MoriMainBridge {
+        @JavascriptInterface
+        public void pickAudioTrack(String callbackId) {
+            if (callbackId == null || callbackId.isEmpty()) return;
+            mainHandler.post(() -> {
+                try {
+                    pendingNativeAudioCallbackId = callbackId;
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("video/*");
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                    startActivityForResult(intent, 203);
+                } catch (Exception e) {
+                    pendingNativeAudioCallbackId = null;
+                    JSONObject response = new JSONObject();
+                    try { response.put("success", false); response.put("error", "Unable to open the video picker."); } catch (Exception ignored) {}
+                    sendNativeAudioCallback(callbackId, response);
+                }
+            });
+        }
+
         @JavascriptInterface
         public void pickSilentVideo(String callbackId) {
             if (callbackId == null || callbackId.isEmpty()) return;
