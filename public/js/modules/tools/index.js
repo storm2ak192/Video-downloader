@@ -1193,6 +1193,9 @@ function initExtractorController() {
   const muteVideoBtn = document.getElementById("extractorMuteVideoBtn");
   const muteVideoLoader = document.getElementById("extractorMuteLoader");
   const muteVideoResult = document.getElementById("extractorMuteResult");
+  const spleeterVideoBtn = document.getElementById("extractorSpleeterVideoBtn");
+  const spleeterVideoLoader = document.getElementById("extractorSpleeterLoader");
+  const spleeterVideoResult = document.getElementById("extractorSpleeterResult");
 
   let selectedVideoFile = null;
   let selectedChannels = "stereo";
@@ -1371,6 +1374,49 @@ function initExtractorController() {
       delete window.__moriSilentVideoCallbacks[callbackId];
       muteVideoBtn.disabled = false;
       muteVideoLoader?.classList.add("hidden");
+      showToast(error?.message || "Could not open video picker.");
+    }
+  });
+
+  spleeterVideoBtn?.addEventListener("click", () => {
+    if (!window.MoriMainBridge?.pickVideoWithoutMusic) {
+      showToast("Spleeter video processing is available in the Mori Android app.");
+      return;
+    }
+    triggerHaptic("medium");
+    spleeterVideoBtn.disabled = true;
+    spleeterVideoLoader?.classList.remove("hidden");
+    spleeterVideoResult?.classList.add("hidden");
+    window.__moriSpleeterVideoCallbacks = window.__moriSpleeterVideoCallbacks || {};
+    const callbackId = "spleeter_video_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    window.__moriSpleeterVideoCallbacks[callbackId] = (rawResult) => {
+      let result;
+      try { result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult; }
+      catch (_) { result = { success: false, error: "Invalid response from Android." }; }
+      spleeterVideoBtn.disabled = false;
+      spleeterVideoLoader?.classList.add("hidden");
+      if (result?.success) {
+        const savedPath = result.location || result.uri || "";
+        const fileName = result.fileName || "video-without-music.mp4";
+        if (spleeterVideoResult) {
+          spleeterVideoResult.textContent = "Saved " + fileName + " to Movies/Mori/Without Music";
+          spleeterVideoResult.classList.remove("hidden");
+        }
+        window.dispatchEvent(new CustomEvent("mori_file_saved", {
+          detail: {
+            url: "mori-tool://spleeter-video/" + Date.now() + "/" + encodeURIComponent(fileName),
+            sourceUrl: "mori-tool://spleeter-video", path: savedPath,
+            uri: result.uri || savedPath, title: fileName, type: "VIDEO"
+          }
+        }));
+        showToast("Video without music created successfully!");
+      } else if (!result?.cancelled) showToast(result?.error || "Could not create video without music.");
+    };
+    try { window.MoriMainBridge.pickVideoWithoutMusic(callbackId); }
+    catch (error) {
+      delete window.__moriSpleeterVideoCallbacks[callbackId];
+      spleeterVideoBtn.disabled = false;
+      spleeterVideoLoader?.classList.add("hidden");
       showToast(error?.message || "Could not open video picker.");
     }
   });
