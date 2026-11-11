@@ -43,7 +43,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools'
+          packages: 'platform-tools;cmake;3.22.1;ndk;28.2.13676358'
 
       - name: Install JavaScript dependencies
         run: npm ci
@@ -53,6 +53,38 @@ jobs:
 
       - name: Sync Capacitor Android project
         run: npx cap sync android
+
+      - name: Prepare sherpa-onnx native C API libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/sherpa-onnx-android.tar.bz2"
+          SHERPA_ROOT="$RUNNER_TEMP/sherpa-onnx-android"
+          mkdir -p "$SHERPA_ROOT"
+          curl -fL --retry 3 --retry-delay 2 https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-android.tar.bz2 -o "$ARCHIVE"
+          echo "39003753ec293425ed56723ea9b972b98841a490af3311670c3060548d654330  $ARCHIVE" | sha256sum -c -
+          tar -xjf "$ARCHIVE" -C "$SHERPA_ROOT"
+          JNI_DIR="android/app/src/main/jniLibs"
+          mkdir -p "$JNI_DIR"
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
+            case "$ABI" in
+              arm64-v8a) MATCH='/(arm64-v8a|aarch64)/' ;;
+              armeabi-v7a) MATCH='/(armeabi-v7a|armv7-eabi)/' ;;
+              x86_64) MATCH='/x86_64/' ;;
+            esac
+            LIBRARY="$(find "$SHERPA_ROOT" -type f -name 'libsherpa-onnx-c-api.so' | grep -E "$MATCH" | head -n 1 || true)"
+            if [ -z "$LIBRARY" ]; then
+              echo "Missing libsherpa-onnx-c-api.so for $ABI in the official Android archive."
+              find "$SHERPA_ROOT" -type f -name '*.so' -print
+              exit 1
+            fi
+            LIB_DIR="$(dirname "$LIBRARY")"
+            mkdir -p "$JNI_DIR/$ABI"
+            find "$LIB_DIR" -maxdepth 1 -type f -name '*.so' -exec cp -f {} "$JNI_DIR/$ABI/" \;
+            test -s "$JNI_DIR/$ABI/libsherpa-onnx-c-api.so"
+          done
+          mkdir -p android/app/src/main/cpp/include/sherpa-onnx/c-api
+          curl -fL --retry 3 https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v2.0.1/sherpa-onnx/c-api/c-api.h -o android/app/src/main/cpp/include/sherpa-onnx/c-api/c-api.h
 
       - name: Run Android unit tests and build debug APK
         working-directory: android
