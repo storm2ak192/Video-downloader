@@ -8,7 +8,8 @@ import java.nio.ByteOrder;
 /** Chunked Spleeter vocals processor used by Media3 Transformer. */
 @UnstableApi
 public final class SpleeterAudioProcessor implements AudioProcessor, AutoCloseable {
-    private static final int CHUNK_SECONDS = 8;
+    // Five-second windows stay below Spleeter's 512-frame STFT block after resampling to 44.1 kHz.
+    private static final int CHUNK_SECONDS = 5;
     private final String vocalsPath, accompanimentPath;
     private AudioFormat inputFormat = AudioFormat.NOT_SET, outputFormat = AudioFormat.NOT_SET;
     private float[] pending;
