@@ -1217,6 +1217,8 @@ function initExtractorController() {
 
   function handleVideoSelected(file) {
     selectedVideoFile = file;
+    resultAudio?.classList.remove("hidden");
+    saveBtn?.classList.remove("hidden");
     const url = URL.createObjectURL(file);
     if (previewVideo) {
       previewVideo.src = url;
@@ -1248,6 +1250,52 @@ function initExtractorController() {
     loader?.classList.remove("hidden");
 
     try {
+    if (window.MoriMainBridge?.pickAudioTrack && window.Capacitor?.isNativePlatform?.()) {
+      window.__moriNativeAudioCallbacks = window.__moriNativeAudioCallbacks || {};
+      const callbackId = "native_audio_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      window.__moriNativeAudioCallbacks[callbackId] = (rawResult) => {
+        let result;
+        try { result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult; }
+        catch (_) { result = { success: false, error: "Invalid response from Android." }; }
+        runBtn.disabled = false;
+        loader?.classList.add("hidden");
+        if (result?.success) {
+          const savedPath = result.location || result.uri || "";
+          const baseName = (result.fileName || "Mori audio").replace(/\\.[^/.]+$/, "");
+          window.dispatchEvent(new CustomEvent("mori_file_saved", {
+            detail: {
+              url: "mori-tool://audio-extractor/" + Date.now() + "/" + encodeURIComponent(result.fileName || "audio.m4a"),
+              sourceUrl: "mori-tool://audio-extractor",
+              path: savedPath,
+              uri: result.uri || savedPath,
+              title: baseName,
+              type: "MP3"
+            }
+          }));
+          if (resultAudio) {
+            resultAudio.pause?.();
+            resultAudio.removeAttribute("src");
+            resultAudio.classList.add("hidden");
+          }
+          saveBtn?.classList.add("hidden");
+          if (resultDetails) resultDetails.textContent = "Saved to Mori Music library · " + formatBytes(result.size || 0) + " · M4A (original AAC stream, no re-encoding)";
+          resultCard?.classList.remove("hidden");
+          showToast("Audio extracted and saved to Mori library.");
+        } else if (!result?.cancelled) {
+          showToast(result?.error || "Could not extract audio.");
+        }
+      };
+      try {
+        window.MoriMainBridge.pickAudioTrack(callbackId);
+      } catch (error) {
+        delete window.__moriNativeAudioCallbacks[callbackId];
+        runBtn.disabled = false;
+        loader?.classList.add("hidden");
+        showToast(error?.message || "Could not open video picker.");
+      }
+      return;
+    }
+
       const res = await extractAudioFromVideoFile(selectedVideoFile, {
         channels: selectedChannels,
       });
@@ -1294,6 +1342,16 @@ function initExtractorController() {
           muteVideoResult.textContent = message;
           muteVideoResult.classList.remove("hidden");
         }
+        window.dispatchEvent(new CustomEvent("mori_file_saved", {
+          detail: {
+            url: "mori-tool://silent-video/" + Date.now() + "/" + encodeURIComponent(result.fileName || "silent-video.mp4"),
+            sourceUrl: "mori-tool://silent-video",
+            path: result.location || "",
+            uri: result.location || "",
+            title: result.fileName || "Silent video",
+            type: "VIDEO"
+          }
+        }));
         showToast("Silent video created successfully!");
       } else if (!result?.cancelled) {
         showToast(result?.error || "Could not create silent video.");
