@@ -426,8 +426,13 @@ public class MainActivity extends BridgeActivity {
             muxerStarted = true;
 
             int initialCapacity = videoFormat.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)
-                ? Math.max(256 * 1024, videoFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE))
+                ? videoFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
                 : 2 * 1024 * 1024;
+            if (initialCapacity <= 0) initialCapacity = 2 * 1024 * 1024;
+            if (initialCapacity > 32 * 1024 * 1024) {
+                throw new IllegalArgumentException("This video reports an unusually large encoded frame; processing was stopped to protect device memory.");
+            }
+            initialCapacity = Math.max(256 * 1024, initialCapacity);
             ByteBuffer sampleBuffer = ByteBuffer.allocateDirect(initialCapacity);
             MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
             boolean wroteVideoSample = false;
@@ -457,7 +462,7 @@ public class MainActivity extends BridgeActivity {
                 ContentValues values = new ContentValues();
                 values.put(MediaStore.MediaColumns.DISPLAY_NAME, outputName);
                 values.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4");
-                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Mori/Silent Videos");
+                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Mori/Silent Videos");
                 values.put(MediaStore.MediaColumns.IS_PENDING, 1);
                 Uri destination = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
                 if (destination == null) throw new IllegalStateException("Could not create the output file in Downloads.");
@@ -476,7 +481,7 @@ public class MainActivity extends BridgeActivity {
                 pendingDestination = null;
                 savedLocation = destination.toString();
             } else {
-                File base = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                File base = getExternalFilesDir(Environment.DIRECTORY_MOVIES);
                 if (base == null) base = getFilesDir();
                 File folder = new File(base, "Mori/Silent Videos");
                 if (!folder.exists() && !folder.mkdirs()) throw new IllegalStateException("Could not create the output folder.");
