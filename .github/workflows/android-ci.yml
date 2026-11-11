@@ -48,6 +48,9 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      - name: Check modified JavaScript module syntax
+        run: node --input-type=module --check < public/js/modules/tools/index.js
+
       - name: Sync Capacitor Android project
         run: npx cap sync android
 
