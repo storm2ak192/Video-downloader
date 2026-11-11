@@ -273,6 +273,7 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
+    // The selected video is transformed with a local Spleeter model; the original silent-video path remains unchanged.
     private void sendSpleeterVideoCallback(String callbackId, JSONObject result) {
         mainHandler.post(() -> {
             try {
