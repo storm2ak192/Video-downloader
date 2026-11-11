@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(morispleeter LANGUAGES C CXX)
+add_library(sherpa_onnx_c_api SHARED IMPORTED)
+set_target_properties(sherpa_onnx_c_api PROPERTIES IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libsherpa-onnx-c-api.so")
+add_library(morispleeter SHARED spleeter_jni.cpp)
+target_include_directories(morispleeter PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_compile_features(morispleeter PRIVATE cxx_std_17)
+target_link_libraries(morispleeter PRIVATE sherpa_onnx_c_api log)
