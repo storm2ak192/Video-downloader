@@ -331,7 +331,7 @@ public class MainActivity extends BridgeActivity {
                 values.put(MediaStore.Audio.Media.DISPLAY_NAME, outputName);
                 values.put(MediaStore.Audio.Media.MIME_TYPE, "audio/mp4");
                 values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/Mori");
-                values.put(MediaStore.Audio.Media.IS_PENDING, 1);
+                values.put(MediaStore.MediaColumns.IS_PENDING, 1);
                 savedUri = getContentResolver().insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
                 if (savedUri == null) throw new IllegalStateException("Could not create the audio file in Music/Mori.");
                 pendingDestination = savedUri;
@@ -344,7 +344,7 @@ public class MainActivity extends BridgeActivity {
                     out.flush();
                 }
                 ContentValues ready = new ContentValues();
-                ready.put(MediaStore.Audio.Media.IS_PENDING, 0);
+                ready.put(MediaStore.MediaColumns.IS_PENDING, 0);
                 getContentResolver().update(savedUri, ready, null, null);
                 pendingDestination = null;
                 savedLocation = savedUri.toString();
