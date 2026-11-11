@@ -231,6 +231,7 @@ public class MainActivity extends BridgeActivity {
         MediaMuxer muxer = null;
         boolean muxerStarted = false;
         JSONObject result = new JSONObject();
+        Uri pendingDestination = null;
         try {
             extractor.setDataSource(this, sourceUri, null);
             int videoTrack = -1;
@@ -264,6 +265,7 @@ public class MainActivity extends BridgeActivity {
                 : 2 * 1024 * 1024;
             ByteBuffer sampleBuffer = ByteBuffer.allocateDirect(initialCapacity);
             MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+            boolean wroteVideoSample = false;
             while (true) {
                 sampleBuffer.clear();
                 int sampleSize = extractor.readSampleData(sampleBuffer, 0);
@@ -275,8 +277,10 @@ public class MainActivity extends BridgeActivity {
                 }
                 bufferInfo.set(0, sampleSize, extractor.getSampleTime(), extractor.getSampleFlags());
                 muxer.writeSampleData(outputTrack, sampleBuffer, bufferInfo);
+                wroteVideoSample = true;
                 if (!extractor.advance()) break;
             }
+            if (!wroteVideoSample) throw new IllegalArgumentException("No video frames were found in the selected file.");
             muxer.stop();
             muxerStarted = false;
             muxer.release();
@@ -292,6 +296,7 @@ public class MainActivity extends BridgeActivity {
                 values.put(MediaStore.MediaColumns.IS_PENDING, 1);
                 Uri destination = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
                 if (destination == null) throw new IllegalStateException("Could not create the output file in Downloads.");
+                pendingDestination = destination;
                 try (InputStream in = new java.io.FileInputStream(tempFile);
                      java.io.OutputStream out = getContentResolver().openOutputStream(destination, "w")) {
                     if (out == null) throw new IllegalStateException("Could not open the output file.");
@@ -303,6 +308,7 @@ public class MainActivity extends BridgeActivity {
                 ContentValues ready = new ContentValues();
                 ready.put(MediaStore.MediaColumns.IS_PENDING, 0);
                 getContentResolver().update(destination, ready, null, null);
+                pendingDestination = null;
                 savedLocation = destination.toString();
             } else {
                 File base = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
@@ -330,6 +336,9 @@ public class MainActivity extends BridgeActivity {
                 result.put("error", error.getMessage() != null ? error.getMessage() : "Unsupported video format.");
             } catch (Exception ignored) {}
         } finally {
+            if (pendingDestination != null) {
+                try { getContentResolver().delete(pendingDestination, null, null); } catch (Exception ignored) {}
+            }
             if (muxer != null) {
                 try { if (muxerStarted) muxer.stop(); } catch (Exception ignored) {}
                 try { muxer.release(); } catch (Exception ignored) {}
