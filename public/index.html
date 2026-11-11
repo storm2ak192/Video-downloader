@@ -1034,6 +1034,17 @@
               <p id="extractorMuteResult" class="tool-file-meta-info hidden"></p>
             </div>
 
+            <div class="tool-config-group">
+              <span class="tool-config-label">Video Without Music (keep vocals)</span>
+              <p class="dropzone-hint">Uses the local Spleeter AI model to separate vocals from accompaniment, then replaces the video's audio track with the vocals. The model downloads once on first use and works offline afterwards.</p>
+              <button type="button" id="extractorSpleeterVideoBtn" class="tool-execute-btn">Create Video Without Music</button>
+              <div id="extractorSpleeterLoader" class="tool-loader-card hidden">
+                <div class="tool-spinner"></div>
+                <span>Preparing Spleeter and separating vocals...</span>
+              </div>
+              <p id="extractorSpleeterResult" class="tool-file-meta-info hidden"></p>
+            </div>
+
             <!-- Video Options Card -->
             <div id="extractorOptionsCard" class="tool-result-card hidden">
               <div class="tool-video-preview-wrap">
