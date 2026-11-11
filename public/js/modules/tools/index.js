@@ -1041,6 +1041,13 @@ function initConverterController() {
 
   dropzone?.addEventListener("click", () => {
     triggerHaptic("light");
+    if (window.MoriMainBridge?.pickAudioTrack && window.Capacitor?.isNativePlatform?.()) {
+      if (videoName) videoName.textContent = "Native video picker";
+      if (videoDetails) videoDetails.textContent = "Choose a video when you tap Extract Audio. Processing uses bounded native buffers.";
+      optionsCard?.classList.remove("hidden");
+      resultCard?.classList.add("hidden");
+      return;
+    }
     fileInput?.click();
   });
 
@@ -1243,7 +1250,8 @@ function initExtractorController() {
   });
 
   runBtn?.addEventListener("click", async () => {
-    if (!selectedVideoFile) return;
+    const nativeAudioAvailable = !!(window.MoriMainBridge?.pickAudioTrack && window.Capacitor?.isNativePlatform?.());
+    if (!selectedVideoFile && !nativeAudioAvailable) return;
     triggerHaptic("medium");
 
     runBtn.disabled = true;
