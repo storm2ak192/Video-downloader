@@ -19,6 +19,12 @@ import java.net.URLDecoder;
 import android.os.Environment;
 import android.media.MediaScannerConnection;
 import android.media.MediaMetadataRetriever;
+import android.media.MediaExtractor;
+import android.media.MediaMuxer;
+import android.media.MediaFormat;
+import android.media.MediaCodec;
+import android.content.ContentValues;
+import android.os.Build;
 import android.media.ThumbnailUtils;
 import android.util.Size;
 import android.provider.MediaStore;
@@ -117,6 +123,7 @@ public class MainActivity extends BridgeActivity {
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private String pendingFolderCallbackId = null;
+    private String pendingSilentVideoCallbackId = null;
 
     private void sendFolderCallback(String callbackId, String path) {
         mainHandler.post(() -> {
@@ -165,6 +172,19 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 202) {
+            final String callbackId = pendingSilentVideoCallbackId;
+            pendingSilentVideoCallbackId = null;
+            if (resultCode == RESULT_OK && data != null && data.getData() != null && callbackId != null) {
+                final Uri selectedUri = data.getData();
+                executor.execute(() -> removeAudioTrackFromVideo(selectedUri, callbackId));
+            } else if (callbackId != null) {
+                JSONObject result = new JSONObject();
+                try { result.put("success", false); result.put("cancelled", true); } catch (Exception ignored) {}
+                sendSilentVideoCallback(callbackId, result);
+            }
+            return;
+        }
         if (requestCode == 201) {
             String selectedPath = "";
             if (resultCode == RESULT_OK && data != null && data.getData() != null) {
@@ -184,7 +204,163 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+
+    private void sendSilentVideoCallback(String callbackId, JSONObject result) {
+        mainHandler.post(() -> {
+            try {
+                WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+                if (webView != null) {
+                    String id = JSONObject.quote(callbackId);
+                    String payload = result != null ? result.toString() : "{\"success\":false,\"error\":\"Unknown error\"}";
+                    webView.evaluateJavascript(
+                        "(function(){var c=window.__moriSilentVideoCallbacks&&window.__moriSilentVideoCallbacks[" + id + "];" +
+                        "if(c){delete window.__moriSilentVideoCallbacks[" + id + "];c(" + JSONObject.quote(payload) + ");}})();",
+                        null
+                    );
+                }
+            } catch (Exception e) {
+                Log.e("MoriMain", "Silent video callback error", e);
+            }
+        });
+    }
+
+    private void removeAudioTrackFromVideo(Uri sourceUri, String callbackId) {
+        File tempFile = new File(getCacheDir(), "mori_silent_" + System.currentTimeMillis() + ".mp4");
+        MediaExtractor extractor = new MediaExtractor();
+        MediaMuxer muxer = null;
+        boolean muxerStarted = false;
+        JSONObject result = new JSONObject();
+        try {
+            extractor.setDataSource(this, sourceUri, null);
+            int videoTrack = -1;
+            MediaFormat videoFormat = null;
+            for (int i = 0; i < extractor.getTrackCount(); i++) {
+                MediaFormat format = extractor.getTrackFormat(i);
+                String mime = format.getString(MediaFormat.KEY_MIME);
+                if (mime != null && mime.startsWith("video/")) {
+                    videoTrack = i;
+                    videoFormat = format;
+                    break;
+                }
+            }
+            if (videoTrack < 0 || videoFormat == null) {
+                throw new IllegalArgumentException("The selected file does not contain a supported video track.");
+            }
+
+            muxer = new MediaMuxer(tempFile.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            int rotation = 0;
+            if (videoFormat.containsKey("rotation-degrees")) {
+                rotation = videoFormat.getInteger("rotation-degrees");
+            }
+            if (rotation != 0) muxer.setOrientationHint(rotation);
+            int outputTrack = muxer.addTrack(videoFormat);
+            extractor.selectTrack(videoTrack);
+            muxer.start();
+            muxerStarted = true;
+
+            int initialCapacity = videoFormat.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)
+                ? Math.max(256 * 1024, videoFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE))
+                : 2 * 1024 * 1024;
+            ByteBuffer sampleBuffer = ByteBuffer.allocateDirect(initialCapacity);
+            MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+            while (true) {
+                sampleBuffer.clear();
+                int sampleSize = extractor.readSampleData(sampleBuffer, 0);
+                if (sampleSize < 0) break;
+                if (sampleSize > sampleBuffer.capacity()) {
+                    sampleBuffer = ByteBuffer.allocateDirect(sampleSize);
+                    sampleSize = extractor.readSampleData(sampleBuffer, 0);
+                    if (sampleSize < 0) break;
+                }
+                bufferInfo.set(0, sampleSize, extractor.getSampleTime(), extractor.getSampleFlags());
+                muxer.writeSampleData(outputTrack, sampleBuffer, bufferInfo);
+                if (!extractor.advance()) break;
+            }
+            muxer.stop();
+            muxerStarted = false;
+            muxer.release();
+            muxer = null;
+
+            String outputName = "Mori_Silent_" + System.currentTimeMillis() + ".mp4";
+            String savedLocation;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.MediaColumns.DISPLAY_NAME, outputName);
+                values.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4");
+                values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Mori/Silent Videos");
+                values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                Uri destination = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                if (destination == null) throw new IllegalStateException("Could not create the output file in Downloads.");
+                try (InputStream in = new java.io.FileInputStream(tempFile);
+                     java.io.OutputStream out = getContentResolver().openOutputStream(destination, "w")) {
+                    if (out == null) throw new IllegalStateException("Could not open the output file.");
+                    byte[] copyBuffer = new byte[64 * 1024];
+                    int count;
+                    while ((count = in.read(copyBuffer)) != -1) out.write(copyBuffer, 0, count);
+                    out.flush();
+                }
+                ContentValues ready = new ContentValues();
+                ready.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                getContentResolver().update(destination, ready, null, null);
+                savedLocation = destination.toString();
+            } else {
+                File base = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                if (base == null) base = getFilesDir();
+                File folder = new File(base, "Mori/Silent Videos");
+                if (!folder.exists() && !folder.mkdirs()) throw new IllegalStateException("Could not create the output folder.");
+                File destination = new File(folder, outputName);
+                try (InputStream in = new java.io.FileInputStream(tempFile);
+                     java.io.OutputStream out = new java.io.FileOutputStream(destination)) {
+                    byte[] copyBuffer = new byte[64 * 1024];
+                    int count;
+                    while ((count = in.read(copyBuffer)) != -1) out.write(copyBuffer, 0, count);
+                    out.flush();
+                }
+                savedLocation = destination.getAbsolutePath();
+            }
+            result.put("success", true);
+            result.put("fileName", outputName);
+            result.put("location", savedLocation);
+            result.put("size", tempFile.length());
+        } catch (Throwable error) {
+            Log.e("MoriMain", "Could not remove video audio track", error);
+            try {
+                result.put("success", false);
+                result.put("error", error.getMessage() != null ? error.getMessage() : "Unsupported video format.");
+            } catch (Exception ignored) {}
+        } finally {
+            if (muxer != null) {
+                try { if (muxerStarted) muxer.stop(); } catch (Exception ignored) {}
+                try { muxer.release(); } catch (Exception ignored) {}
+            }
+            try { extractor.release(); } catch (Exception ignored) {}
+            if (tempFile.exists()) tempFile.delete();
+        }
+        sendSilentVideoCallback(callbackId, result);
+    }
+
     public class MoriMainBridge {
+        @JavascriptInterface
+        public void pickSilentVideo(String callbackId) {
+            if (callbackId == null || callbackId.isEmpty()) return;
+            mainHandler.post(() -> {
+                try {
+                    pendingSilentVideoCallbackId = callbackId;
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("video/*");
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                    startActivityForResult(intent, 202);
+                } catch (Exception e) {
+                    pendingSilentVideoCallbackId = null;
+                    JSONObject result = new JSONObject();
+                    try { result.put("success", false); result.put("error", "Unable to open the video picker."); } catch (Exception ignored) {}
+                    sendSilentVideoCallback(callbackId, result);
+                }
+            });
+        }
+
+
         @JavascriptInterface
         public String getEngineSecurityKey(String challenge) {
             try {
