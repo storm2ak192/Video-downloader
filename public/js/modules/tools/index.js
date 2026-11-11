@@ -1183,6 +1183,9 @@ function initExtractorController() {
   const resultAudio = document.getElementById("extractorResultAudio");
   const resultDetails = document.getElementById("extractorResultDetails");
   const saveBtn = document.getElementById("extractorSaveBtn");
+  const muteVideoBtn = document.getElementById("extractorMuteVideoBtn");
+  const muteVideoLoader = document.getElementById("extractorMuteLoader");
+  const muteVideoResult = document.getElementById("extractorMuteResult");
 
   let selectedVideoFile = null;
   let selectedChannels = "stereo";
@@ -1264,6 +1267,45 @@ function initExtractorController() {
     } finally {
       runBtn.disabled = false;
       loader?.classList.add("hidden");
+    }
+  });
+
+
+  muteVideoBtn?.addEventListener("click", () => {
+    if (!window.MoriMainBridge?.pickSilentVideo) {
+      showToast("Silent video processing is available in the Mori Android app.");
+      return;
+    }
+    triggerHaptic("medium");
+    muteVideoBtn.disabled = true;
+    muteVideoLoader?.classList.remove("hidden");
+    muteVideoResult?.classList.add("hidden");
+    window.__moriSilentVideoCallbacks = window.__moriSilentVideoCallbacks || {};
+    const callbackId = "silent_video_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    window.__moriSilentVideoCallbacks[callbackId] = (rawResult) => {
+      let result;
+      try { result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult; }
+      catch (_) { result = { success: false, error: "Invalid response from Android." }; }
+      muteVideoBtn.disabled = false;
+      muteVideoLoader?.classList.add("hidden");
+      if (result?.success) {
+        const message = "Saved " + (result.fileName || "silent video") + " to Downloads/Mori/Silent Videos";
+        if (muteVideoResult) {
+          muteVideoResult.textContent = message;
+          muteVideoResult.classList.remove("hidden");
+        }
+        showToast("Silent video created successfully!");
+      } else if (!result?.cancelled) {
+        showToast(result?.error || "Could not create silent video.");
+      }
+    };
+    try {
+      window.MoriMainBridge.pickSilentVideo(callbackId);
+    } catch (error) {
+      delete window.__moriSilentVideoCallbacks[callbackId];
+      muteVideoBtn.disabled = false;
+      muteVideoLoader?.classList.add("hidden");
+      showToast(error?.message || "Could not open video picker.");
     }
   });
 
