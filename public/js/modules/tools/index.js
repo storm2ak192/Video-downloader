@@ -1285,7 +1285,7 @@ function initExtractorController() {
             resultAudio.classList.add("hidden");
           }
           saveBtn?.classList.add("hidden");
-          if (resultDetails) resultDetails.textContent = "Saved to Mori Music library · " + (result.durationUs ? formatTimestamp(result.durationUs / 1000000) + " · " : "") + formatBytes(result.size || 0) + " · M4A (original AAC stream, no re-encoding)";
+          if (resultDetails) resultDetails.textContent = "Saved to Mori Music library · " + (result.durationUs ? formatTimestamp(result.durationUs / 1000000) + " · " : "") + formatBytes(result.size || 0) + " · M4A/AAC (direct copy when compatible; otherwise device decoding and re-encoding)";
           resultCard?.classList.remove("hidden");
           showToast("Audio extracted and saved to Mori library.");
         } else if (!result?.cancelled) {
