@@ -44,17 +44,17 @@ export async function separateVideoAudioFile(file,onProgress=null,options={}){
   return {audioBuffer:vocals,blob,duration:vocals.duration,sampleRate:rate,audioSize,format:"audio/wav"};
  }finally{if(worker)worker.terminate();if(ctx){try{await ctx.close();}catch(_){}}}
 }
-export async function recordVideoFromFile(file,audioBuffer=null,onProgress=null){
+export async function recordVideoFromFile(file,audioBuffer=null,onProgress=null,externalAudioContext=null){
  if(!file||!(file instanceof Blob))throw new Error("Choose a video file first.");
  if(!("MediaRecorder" in window))throw new Error("This browser does not support local video recording.");
  const url=URL.createObjectURL(file),video=document.createElement("video");video.muted=true;video.playsInline=true;video.preload="auto";video.src=url;
- let ctx=null,source=null,stream=null,recorder=null,progressHandler=null;
+ let ctx=externalAudioContext,ownsContext=!externalAudioContext,source=null,stream=null,recorder=null,progressHandler=null;
  try{
   await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(new Error("The browser cannot decode this video."));});
   const capture=video.captureStream||video.mozCaptureStream;if(typeof capture!=="function")throw new Error("This browser cannot capture local video. Try Chrome on Android or desktop.");
   stream=capture.call(video);const videoTracks=stream.getVideoTracks();if(!videoTracks.length)throw new Error("No video track is available.");
   const tracks=[...videoTracks];
-  if(audioBuffer){const AudioCtx=window.AudioContext||window.webkitAudioContext;ctx=new AudioCtx({sampleRate:audioBuffer.sampleRate});await ctx.resume();const dest=ctx.createMediaStreamDestination();source=ctx.createBufferSource();source.buffer=audioBuffer;source.connect(dest);tracks.push(...dest.stream.getAudioTracks());}
+  if(audioBuffer){const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!ctx){ctx=new AudioCtx({sampleRate:audioBuffer.sampleRate});ownsContext=true;}await ctx.resume();const dest=ctx.createMediaStreamDestination();source=ctx.createBufferSource();source.buffer=audioBuffer;source.connect(dest);tracks.push(...dest.stream.getAudioTracks());}
   const output=new MediaStream(tracks),types=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"],mime=types.find(t=>MediaRecorder.isTypeSupported(t));
   if(!mime)throw new Error("No supported WebM encoder is available.");
   const chunks=[];recorder=new MediaRecorder(output,{mimeType:mime,videoBitsPerSecond:Math.min(10000000,Math.max(2500000,(video.videoWidth||1280)*(video.videoHeight||720)*4))});
@@ -66,6 +66,6 @@ export async function recordVideoFromFile(file,audioBuffer=null,onProgress=null)
  }finally{
   if(progressHandler)video.removeEventListener("timeupdate",progressHandler);if(recorder&&recorder.state!=="inactive"){try{recorder.stop();}catch(_){}}
   if(source){try{source.stop();}catch(_){}try{source.disconnect();}catch(_){}}if(stream)stream.getTracks().forEach(t=>t.stop());
-  video.pause();video.removeAttribute("src");video.load();URL.revokeObjectURL(url);if(ctx){try{await ctx.close();}catch(_){}}
+  video.pause();video.removeAttribute("src");video.load();URL.revokeObjectURL(url);if(ctx&&ownsContext){try{await ctx.close();}catch(_){}}
  }
 }
