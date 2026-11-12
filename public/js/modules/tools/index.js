@@ -1478,7 +1478,7 @@ function initExtractorController() {
       setProcessingMessage(spleeterVideoLoader, "Loading the local Spleeter model...");
       const separated = await separateVideoAudioFile(selectedVideoFile, (progress) => {
         if (progress?.message) setProcessingMessage(spleeterVideoLoader, progress.message);
-      });
+      }, { includeWav: false });
       setProcessingMessage(spleeterVideoLoader, "Replacing the video's soundtrack and recording WebM...");
       const output = await recordVideoFromFile(selectedVideoFile, separated.audioBuffer, (progress) => {
         if (progress?.message) setProcessingMessage(spleeterVideoLoader, progress.message);
