@@ -914,15 +914,8 @@ downloadBtn.addEventListener("click", async () => {
       // Auto-Clear Input Box
       autoClearInputBox();
 
-      // Auto Download Link if enabled
-      if (localStorage.getItem("mori_auto_download") === "true" && !/(facebook\.com|fb\.watch)/i.test(url)) {
-        setTimeout(() => {
-          const dlBtn = document.querySelector(
-            "#resultSection .dl-item, #resultSection .btn-download, #resultSection .dl-btn, #resultSection [data-url]",
-          );
-          if (dlBtn) dlBtn.click();
-        }, 500);
-      }
+      // Always require an explicit media/quality choice on every platform.
+      // No scraper result may trigger an automatic first-option download.
     } else {
       downloadBtn.removeEventListener("click", cancelAnalyzeHandler);
       const errMsg = data?.message || "Unknown error occurred.";
