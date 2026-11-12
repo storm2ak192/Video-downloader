@@ -51,6 +51,8 @@ export async function recordVideoFromFile(file,audioBuffer=null,onProgress=null,
  let ctx=externalAudioContext,ownsContext=!externalAudioContext,source=null,stream=null,recorder=null,progressHandler=null;
  try{
   await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(new Error("The browser cannot decode this video."));});
+  const maxDuration=(navigator.deviceMemory||4)<=2?120:600;
+  if(video.duration>maxDuration)throw new Error("This browser video-processing mode is limited to "+Math.round(maxDuration/60)+" minutes per file to protect device memory.");
   const capture=video.captureStream||video.mozCaptureStream;if(typeof capture!=="function")throw new Error("This browser cannot capture local video. Try Chrome on Android or desktop.");
   stream=capture.call(video);const videoTracks=stream.getVideoTracks();if(!videoTracks.length)throw new Error("No video track is available.");
   const tracks=[...videoTracks];
