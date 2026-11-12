@@ -51,6 +51,19 @@ install(FILES
 CMAKE
 fi
 
+# Vercel's build image may not include CMake. Install a pinned portable
+# binary locally instead of relying on apt or changing the runner image.
+if ! command -v cmake >/dev/null 2>&1; then
+  CMAKE_VERSION="3.30.5"
+  CMAKE_ARCHIVE="$BUILD_ROOT/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz"
+  CMAKE_URL="https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz"
+  mkdir -p "$BUILD_ROOT/tools"
+  curl -fL --retry 3 "$CMAKE_URL" -o "$CMAKE_ARCHIVE"
+  tar -xzf "$CMAKE_ARCHIVE" -C "$BUILD_ROOT/tools"
+  export PATH="$BUILD_ROOT/tools/cmake-${CMAKE_VERSION}-linux-x86_64/bin:$PATH"
+fi
+cmake --version
+
 export SHERPA_ONNX_IS_USING_BUILD_WASM_SH=ON
 cmake -S "$SHERPA_ROOT" -B "$BUILD_ROOT/build" \
   -DCMAKE_BUILD_TYPE=Release \
