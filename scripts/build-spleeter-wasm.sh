@@ -36,7 +36,7 @@ target_link_options(mori-spleeter-wasm PRIVATE
   "-sEXPORT_NAME=createMoriSpleeterModule"
   "-sENVIRONMENT=web,worker"
   "-sALLOW_MEMORY_GROWTH=1"
-  "-sINITIAL_MEMORY=256MB"
+  "-sINITIAL_MEMORY=128MB"
   "-sSTACK_SIZE=10485760"
   "-sFILESYSTEM=1"
   "-sEXPORTED_FUNCTIONS=['_malloc','_free','_MoriSpleeterCreate','_MoriSpleeterProcess','_MoriSpleeterDestroy']"
