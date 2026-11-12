@@ -1025,7 +1025,7 @@
 
             <div class="tool-config-group">
               <span class="tool-config-label">Silent Video (remove the audio track)</span>
-              <p class="dropzone-hint">Copies the original video stream without re-encoding. Android 10+: Movies/Mori/Silent Videos. Older Android: app-specific Mori Movies storage.</p>
+              <p class="dropzone-hint">Removes the audio track. Android saves MP4 without re-encoding; browser mode creates a WebM copy locally.</p>
               <button type="button" id="extractorMuteVideoBtn" class="tool-execute-btn">Create Silent Video</button>
               <div id="extractorMuteLoader" class="tool-loader-card hidden">
                 <div class="tool-spinner"></div>
@@ -1036,13 +1036,30 @@
 
             <div class="tool-config-group">
               <span class="tool-config-label">Video Without Music (keep vocals)</span>
-              <p class="dropzone-hint">Uses the local Spleeter AI model to separate vocals from accompaniment, then replaces the video's audio track with the vocals. The model downloads once on first use and works offline afterwards.</p>
+              <p class="dropzone-hint">Separates vocals from music locally. Browser mode uses WebAssembly and exports WebM; Android uses its native processor. Model files download once, then are cached on this device.</p>
               <button type="button" id="extractorSpleeterVideoBtn" class="tool-execute-btn">Create Video Without Music</button>
               <div id="extractorSpleeterLoader" class="tool-loader-card hidden">
                 <div class="tool-spinner"></div>
                 <span>Preparing Spleeter and separating vocals...</span>
               </div>
               <p id="extractorSpleeterResult" class="tool-file-meta-info hidden"></p>
+            </div>
+
+            <div class="tool-config-group">
+              <span class="tool-config-label">Audio Without Music (vocals only)</span>
+              <p class="dropzone-hint">Creates a vocals-only WAV file using the same on-device Spleeter model.</p>
+              <button type="button" id="extractorSpleeterAudioBtn" class="tool-execute-btn">Extract Vocals Only</button>
+              <div id="extractorSpleeterAudioLoader" class="tool-loader-card hidden">
+                <div class="tool-spinner"></div>
+                <span>Loading local Spleeter model...</span>
+              </div>
+              <div id="extractorSpleeterAudioResult" class="tool-result-card hidden">
+                <audio id="extractorSpleeterAudioPreview" controls></audio>
+                <div class="sflgl-action-row">
+                  <button type="button" id="extractorSpleeterAudioSaveBtn" class="tool-btn-primary">Save Vocals Audio</button>
+                </div>
+                <p id="extractorSpleeterAudioDetails" class="tool-file-meta-info"></p>
+              </div>
             </div>
 
             <!-- Video Options Card -->
