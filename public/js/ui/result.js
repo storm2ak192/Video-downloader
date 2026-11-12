@@ -1070,6 +1070,11 @@ export function renderResult(result, originalUrl) {
       downloadList.appendChild(pdfBtn);
     }
 
+    const selectionHeading = document.createElement("div");
+    selectionHeading.className = "download-options-heading";
+    selectionHeading.textContent = "Choose a format or quality (" + result.downloads.length + " option(s))";
+    downloadList.appendChild(selectionHeading);
+
     const hasVideoDownload = result.downloads.some((item) => {
       const type = String(item.type || "").toUpperCase();
       const url = String(item.url || "").toLowerCase();
