@@ -1227,7 +1227,7 @@ function initExtractorController() {
   }
 
   function getSelectedBaseName() {
-    return (selectedVideoFile?.name || "Mori video").replace(/\\.[^/.]+$/, "");
+    return (selectedVideoFile?.name || "Mori video").replace(/\.[^/.]+$/, "");
   }
 
   dropzone?.addEventListener("click", () => {
