@@ -22,8 +22,8 @@ export async function separateVideoAudioFile(file,onProgress=null,options={}){
  let ctx,worker;
  try{
   ctx=new AudioCtx({sampleRate:44100});
-  const bytes=await file.arrayBuffer();let source;
-  try{source=await ctx.decodeAudioData(bytes);}catch{throw new Error("Could not read the video's audio track. It may be silent or use an unsupported codec.");}
+  let bytes=await file.arrayBuffer();let source;
+  try{source=await ctx.decodeAudioData(bytes);}catch{throw new Error("Could not read the video's audio track. It may be silent or use an unsupported codec.");}finally{bytes=null;}
   worker=new Worker(new URL("./spleeter.worker.js",import.meta.url));
   await request(worker,"init",{},[],onProgress);
   const rate=source.sampleRate,total=source.length,chunkSize=Math.max(1,Math.floor(rate*CHUNK_SECONDS)),parts=[];
