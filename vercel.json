@@ -2,5 +2,6 @@
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
-  "outputDirectory": "public"
+  "outputDirectory": "public",
+  "buildCommand": "npm run build:web"
 }
