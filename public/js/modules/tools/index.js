@@ -8,6 +8,7 @@ import { findTikTokUser } from "./tiktokFinder.js";
 import { searchAnimeScene, formatTimestamp } from "./animeSearch.js";
 import { convertImage } from "./imageConverter.js";
 import { extractAudioFromVideoFile } from "./audioExtractor.js";
+import { separateVideoAudioFile, recordVideoFromFile } from "./spleeterWeb.js";
 import { compressPdfFile } from "./pdfCompressor.js";
 import { checkAllUsernames, CHECKER_PLATFORMS } from "./usernameChecker.js";
 import { saveBlobToMori } from "./storageHelper.js";
@@ -1196,10 +1197,38 @@ function initExtractorController() {
   const spleeterVideoBtn = document.getElementById("extractorSpleeterVideoBtn");
   const spleeterVideoLoader = document.getElementById("extractorSpleeterLoader");
   const spleeterVideoResult = document.getElementById("extractorSpleeterResult");
+  const spleeterAudioBtn = document.getElementById("extractorSpleeterAudioBtn");
+  const spleeterAudioLoader = document.getElementById("extractorSpleeterAudioLoader");
+  const spleeterAudioResult = document.getElementById("extractorSpleeterAudioResult");
+  const spleeterAudioPreview = document.getElementById("extractorSpleeterAudioPreview");
+  const spleeterAudioDetails = document.getElementById("extractorSpleeterAudioDetails");
+  const spleeterAudioSaveBtn = document.getElementById("extractorSpleeterAudioSaveBtn");
 
   let selectedVideoFile = null;
   let selectedChannels = "stereo";
   let extractedAudioBlob = null;
+  let spleeterAudioBlob = null;
+
+  function downloadProcessedBlob(blob, fileName) {
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+    showToast("Downloaded: " + fileName);
+  }
+
+  function setProcessingMessage(loaderElement, message) {
+    const label = loaderElement?.querySelector("span");
+    if (label) label.textContent = message;
+  }
+
+  function getSelectedBaseName() {
+    return (selectedVideoFile?.name || "Mori video").replace(/\\.[^/.]+$/, "");
+  }
 
   dropzone?.addEventListener("click", () => {
     triggerHaptic("light");
@@ -1241,6 +1270,10 @@ function initExtractorController() {
     }
     optionsCard?.classList.remove("hidden");
     resultCard?.classList.add("hidden");
+    muteVideoResult?.classList.add("hidden");
+    spleeterVideoResult?.classList.add("hidden");
+    spleeterAudioResult?.classList.add("hidden");
+    spleeterAudioBlob = null;
   }
 
   channelChips.forEach((chip) => {
@@ -1330,94 +1363,185 @@ function initExtractorController() {
   });
 
 
-  muteVideoBtn?.addEventListener("click", () => {
-    if (!window.MoriMainBridge?.pickSilentVideo) {
-      showToast("Silent video processing is available in the Mori Android app.");
+  muteVideoBtn?.addEventListener("click", async () => {
+    const isNative = !!(window.MoriMainBridge?.pickSilentVideo && window.Capacitor?.isNativePlatform?.());
+    if (!isNative && !selectedVideoFile) {
+      showToast("Choose a video file first.");
+      fileInput?.click();
       return;
     }
     triggerHaptic("medium");
     muteVideoBtn.disabled = true;
     muteVideoLoader?.classList.remove("hidden");
     muteVideoResult?.classList.add("hidden");
-    window.__moriSilentVideoCallbacks = window.__moriSilentVideoCallbacks || {};
-    const callbackId = "silent_video_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-    window.__moriSilentVideoCallbacks[callbackId] = (rawResult) => {
-      let result;
-      try { result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult; }
-      catch (_) { result = { success: false, error: "Invalid response from Android." }; }
-      muteVideoBtn.disabled = false;
-      muteVideoLoader?.classList.add("hidden");
-      if (result?.success) {
-        const message = "Saved " + (result.fileName || "silent video") + " to Movies/Mori/Silent Videos";
-        if (muteVideoResult) {
-          muteVideoResult.textContent = message;
-          muteVideoResult.classList.remove("hidden");
-        }
-        window.dispatchEvent(new CustomEvent("mori_file_saved", {
-          detail: {
-            url: "mori-tool://silent-video/" + Date.now() + "/" + encodeURIComponent(result.fileName || "silent-video.mp4"),
-            sourceUrl: "mori-tool://silent-video",
-            path: result.location || "",
-            uri: result.location || "",
-            title: result.fileName || "Silent video",
-            type: "VIDEO"
-          }
-        }));
-        showToast("Silent video created successfully!");
-      } else if (!result?.cancelled) {
-        showToast(result?.error || "Could not create silent video.");
+
+    if (isNative) {
+      window.__moriSilentVideoCallbacks = window.__moriSilentVideoCallbacks || {};
+      const callbackId = "silent_video_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      window.__moriSilentVideoCallbacks[callbackId] = (rawResult) => {
+        let result;
+        try { result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult; }
+        catch (_) { result = { success: false, error: "Invalid response from Android." }; }
+        muteVideoBtn.disabled = false;
+        muteVideoLoader?.classList.add("hidden");
+        if (result?.success) {
+          const message = "Saved " + (result.fileName || "silent video") + " to Movies/Mori/Silent Videos";
+          if (muteVideoResult) { muteVideoResult.textContent = message; muteVideoResult.classList.remove("hidden"); }
+          window.dispatchEvent(new CustomEvent("mori_file_saved", {
+            detail: {
+              url: "mori-tool://silent-video/" + Date.now() + "/" + encodeURIComponent(result.fileName || "silent-video.mp4"),
+              sourceUrl: "mori-tool://silent-video", path: result.location || "",
+              uri: result.location || "", title: result.fileName || "Silent video", type: "VIDEO"
+            }
+          }));
+          showToast("Silent video created successfully!");
+        } else if (!result?.cancelled) showToast(result?.error || "Could not create silent video.");
+      };
+      try { window.MoriMainBridge.pickSilentVideo(callbackId); }
+      catch (error) {
+        delete window.__moriSilentVideoCallbacks[callbackId];
+        muteVideoBtn.disabled = false;
+        muteVideoLoader?.classList.add("hidden");
+        showToast(error?.message || "Could not open video picker.");
       }
-    };
+      return;
+    }
+
     try {
-      window.MoriMainBridge.pickSilentVideo(callbackId);
+      setProcessingMessage(muteVideoLoader, "Recording a silent WebM copy locally...");
+      const output = await recordVideoFromFile(selectedVideoFile, null, (progress) => {
+        if (progress?.message) setProcessingMessage(muteVideoLoader, progress.message);
+      });
+      const fileName = getSelectedBaseName() + "_silent.webm";
+      downloadProcessedBlob(output.blob, fileName);
+      if (muteVideoResult) {
+        muteVideoResult.textContent = "Created " + fileName + " (WebM; browser re-encodes the video).";
+        muteVideoResult.classList.remove("hidden");
+      }
     } catch (error) {
-      delete window.__moriSilentVideoCallbacks[callbackId];
+      showToast(error?.message || "Could not create silent video.");
+    } finally {
       muteVideoBtn.disabled = false;
       muteVideoLoader?.classList.add("hidden");
-      showToast(error?.message || "Could not open video picker.");
     }
   });
 
-  spleeterVideoBtn?.addEventListener("click", () => {
-    if (!window.MoriMainBridge?.pickVideoWithoutMusic) {
-      showToast("Spleeter video processing is available in the Mori Android app.");
+  spleeterVideoBtn?.addEventListener("click", async () => {
+    const isNative = !!(window.MoriMainBridge?.pickVideoWithoutMusic && window.Capacitor?.isNativePlatform?.());
+    if (!isNative && !selectedVideoFile) {
+      showToast("Choose a video file first.");
+      fileInput?.click();
       return;
     }
     triggerHaptic("medium");
     spleeterVideoBtn.disabled = true;
     spleeterVideoLoader?.classList.remove("hidden");
     spleeterVideoResult?.classList.add("hidden");
-    window.__moriSpleeterVideoCallbacks = window.__moriSpleeterVideoCallbacks || {};
-    const callbackId = "spleeter_video_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-    window.__moriSpleeterVideoCallbacks[callbackId] = (rawResult) => {
-      let result;
-      try { result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult; }
-      catch (_) { result = { success: false, error: "Invalid response from Android." }; }
-      spleeterVideoBtn.disabled = false;
-      spleeterVideoLoader?.classList.add("hidden");
-      if (result?.success) {
-        const savedPath = result.location || result.uri || "";
-        const fileName = result.fileName || "video-without-music.mp4";
-        if (spleeterVideoResult) {
-          spleeterVideoResult.textContent = "Saved " + fileName + " to Movies/Mori/Without Music";
-          spleeterVideoResult.classList.remove("hidden");
-        }
-        window.dispatchEvent(new CustomEvent("mori_file_saved", {
-          detail: {
-            url: "mori-tool://spleeter-video/" + Date.now() + "/" + encodeURIComponent(fileName),
-            sourceUrl: "mori-tool://spleeter-video", path: savedPath,
-            uri: result.uri || savedPath, title: fileName, type: "VIDEO"
+
+    if (isNative) {
+      window.__moriSpleeterVideoCallbacks = window.__moriSpleeterVideoCallbacks || {};
+      const callbackId = "spleeter_video_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      window.__moriSpleeterVideoCallbacks[callbackId] = (rawResult) => {
+        let result;
+        try { result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult; }
+        catch (_) { result = { success: false, error: "Invalid response from Android." }; }
+        spleeterVideoBtn.disabled = false;
+        spleeterVideoLoader?.classList.add("hidden");
+        if (result?.success) {
+          const savedPath = result.location || result.uri || "";
+          const fileName = result.fileName || "video-without-music.mp4";
+          if (spleeterVideoResult) {
+            spleeterVideoResult.textContent = "Saved " + fileName + " to Movies/Mori/Without Music";
+            spleeterVideoResult.classList.remove("hidden");
           }
-        }));
-        showToast("Video without music created successfully!");
-      } else if (!result?.cancelled) showToast(result?.error || "Could not create video without music.");
-    };
-    try { window.MoriMainBridge.pickVideoWithoutMusic(callbackId); }
-    catch (error) {
-      delete window.__moriSpleeterVideoCallbacks[callbackId];
+          window.dispatchEvent(new CustomEvent("mori_file_saved", {
+            detail: {
+              url: "mori-tool://spleeter-video/" + Date.now() + "/" + encodeURIComponent(fileName),
+              sourceUrl: "mori-tool://spleeter-video", path: savedPath,
+              uri: result.uri || savedPath, title: fileName, type: "VIDEO"
+            }
+          }));
+          showToast("Video without music created successfully!");
+        } else if (!result?.cancelled) showToast(result?.error || "Could not create video without music.");
+      };
+      try { window.MoriMainBridge.pickVideoWithoutMusic(callbackId); }
+      catch (error) {
+        delete window.__moriSpleeterVideoCallbacks[callbackId];
+        spleeterVideoBtn.disabled = false;
+        spleeterVideoLoader?.classList.add("hidden");
+        showToast(error?.message || "Could not open video picker.");
+      }
+      return;
+    }
+
+    try {
+      setProcessingMessage(spleeterVideoLoader, "Loading the local Spleeter model...");
+      const separated = await separateVideoAudioFile(selectedVideoFile, (progress) => {
+        if (progress?.message) setProcessingMessage(spleeterVideoLoader, progress.message);
+      });
+      setProcessingMessage(spleeterVideoLoader, "Replacing the video's soundtrack and recording WebM...");
+      const output = await recordVideoFromFile(selectedVideoFile, separated.audioBuffer, (progress) => {
+        if (progress?.message) setProcessingMessage(spleeterVideoLoader, progress.message);
+      });
+      const fileName = getSelectedBaseName() + "_without_music.webm";
+      downloadProcessedBlob(output.blob, fileName);
+      if (spleeterVideoResult) {
+        spleeterVideoResult.textContent = "Created " + fileName + " with the separated vocals. Browser output is WebM.";
+        spleeterVideoResult.classList.remove("hidden");
+      }
+    } catch (error) {
+      showToast(error?.message || "Could not create video without music.");
+    } finally {
       spleeterVideoBtn.disabled = false;
       spleeterVideoLoader?.classList.add("hidden");
-      showToast(error?.message || "Could not open video picker.");
+    }
+  });
+
+  spleeterAudioBtn?.addEventListener("click", async () => {
+    if (!selectedVideoFile) {
+      showToast("Choose a video file first.");
+      fileInput?.click();
+      return;
+    }
+    triggerHaptic("medium");
+    spleeterAudioBtn.disabled = true;
+    spleeterAudioLoader?.classList.remove("hidden");
+    spleeterAudioResult?.classList.add("hidden");
+    try {
+      setProcessingMessage(spleeterAudioLoader, "Loading the local Spleeter model...");
+      const separated = await separateVideoAudioFile(selectedVideoFile, (progress) => {
+        if (progress?.message) setProcessingMessage(spleeterAudioLoader, progress.message);
+      });
+      spleeterAudioBlob = separated.blob;
+      if (spleeterAudioPreview) spleeterAudioPreview.src = URL.createObjectURL(separated.blob);
+      if (spleeterAudioDetails) {
+        spleeterAudioDetails.textContent = formatTimestamp(separated.duration) + " · " +
+          formatBytes(separated.audioSize) + " · " + (separated.sampleRate / 1000).toFixed(1) +
+          " kHz WAV · vocals stem";
+      }
+      spleeterAudioResult?.classList.remove("hidden");
+      showToast("Vocals-only audio is ready.");
+    } catch (error) {
+      showToast(error?.message || "Could not separate vocals.");
+    } finally {
+      spleeterAudioBtn.disabled = false;
+      spleeterAudioLoader?.classList.add("hidden");
+    }
+  });
+
+  spleeterAudioSaveBtn?.addEventListener("click", async () => {
+    if (!spleeterAudioBlob) return;
+    const fileName = getSelectedBaseName() + "_vocals.wav";
+    if (window.Capacitor?.isNativePlatform?.()) {
+      spleeterAudioSaveBtn.disabled = true;
+      await saveBlobToMori(spleeterAudioBlob, fileName, "Download/Mori/Music", {
+        title: getSelectedBaseName() + " (Vocals Only)",
+        type: "MP3",
+        tool: "spleeter-vocals",
+      });
+      spleeterAudioSaveBtn.disabled = false;
+    } else {
+      downloadProcessedBlob(spleeterAudioBlob, fileName);
     }
   });
 
