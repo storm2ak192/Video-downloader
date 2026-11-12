@@ -1474,7 +1474,12 @@ function initExtractorController() {
       return;
     }
 
+    let playbackAudioContext = null;
     try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) throw new Error("Web Audio API is not supported in this browser.");
+      playbackAudioContext = new AudioCtx();
+      await playbackAudioContext.resume();
       setProcessingMessage(spleeterVideoLoader, "Loading the local Spleeter model...");
       const separated = await separateVideoAudioFile(selectedVideoFile, (progress) => {
         if (progress?.message) setProcessingMessage(spleeterVideoLoader, progress.message);
@@ -1482,7 +1487,7 @@ function initExtractorController() {
       setProcessingMessage(spleeterVideoLoader, "Replacing the video's soundtrack and recording WebM...");
       const output = await recordVideoFromFile(selectedVideoFile, separated.audioBuffer, (progress) => {
         if (progress?.message) setProcessingMessage(spleeterVideoLoader, progress.message);
-      });
+      }, playbackAudioContext);
       const fileName = getSelectedBaseName() + "_without_music.webm";
       downloadProcessedBlob(output.blob, fileName);
       if (spleeterVideoResult) {
@@ -1492,6 +1497,7 @@ function initExtractorController() {
     } catch (error) {
       showToast(error?.message || "Could not create video without music.");
     } finally {
+      if (playbackAudioContext) { try { await playbackAudioContext.close(); } catch (_) {} }
       spleeterVideoBtn.disabled = false;
       spleeterVideoLoader?.classList.add("hidden");
     }
