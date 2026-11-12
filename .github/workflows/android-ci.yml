@@ -1,16 +1,6 @@
 name: Android CI
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "android/**"
-      - "public/**"
-      - "third_party/**"
-      - "package.json"
-      - "package-lock.json"
-      - "capacitor.config.*"
-      - ".github/workflows/android-ci.yml"
   workflow_dispatch:
 
 permissions:
