@@ -5,6 +5,7 @@ import * as utils from "../utils/index.js";
 import * as urlUtils from "../utils/urlUtils.js";
 import * as core from "../modules/core.js";
 import { scraperFetch } from "./httpHelper.js";
+import { scrapeFacebookWeb } from "./facebook.js";
 
 export * from "./httpHelper.js";
 
@@ -176,7 +177,14 @@ export async function scrapeDouyin(url, ...rest) {
 export async function scrapeThreads(...args) { return (await loadCoreScrapers()).scrapeThreads(...args); }
 export async function scrapePinterest(...args) { return (await loadCoreScrapers()).scrapePinterest(...args); }
 export async function scrapeAppleMusic(...args) { return (await loadCoreScrapers()).scrapeAppleMusic(...args); }
-export async function scrapeFacebook(...args) { return (await loadCoreScrapers()).scrapeFacebook(...args); }
+export async function scrapeFacebook(url, ...args) {
+  // Browsers cannot make SnapSave's cross-origin form requests directly.
+  // The Vercel function performs only this fixed Facebook -> SnapSave resolution.
+  if (!window.Capacitor?.isNativePlatform?.()) {
+    return scrapeFacebookWeb(url);
+  }
+  return (await loadCoreScrapers()).scrapeFacebook(url, ...args);
+}
 export async function scrapeBandcamp(...args) { return (await loadCoreScrapers()).scrapeBandcamp(...args); }
 export async function scrapeReddit(...args) { return (await loadCoreScrapers()).scrapeReddit(...args); }
 export async function scrapeTeraBox(...args) { return (await loadCoreScrapers()).scrapeTeraBox(...args); }
