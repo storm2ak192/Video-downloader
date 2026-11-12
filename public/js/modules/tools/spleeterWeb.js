@@ -14,7 +14,7 @@ function resample(input,sourceFrames,targetFrames){
  for(let i=0;i<targetFrames;i++){const p=i*scale,l=Math.floor(p),r=Math.min(sourceFrames-1,l+1),mix=p-l;out[2*i]=input[2*l]*(1-mix)+input[2*r]*mix;out[2*i+1]=input[2*l+1]*(1-mix)+input[2*r+1]*mix;}
  return out;
 }
-export async function separateVideoAudioFile(file,onProgress=null){
+export async function separateVideoAudioFile(file,onProgress=null,options={}){
  if(!file||!(file instanceof Blob))throw new Error("Choose a video file first.");
  if(file.size>MAX_VIDEO_BYTES)throw new Error("Spleeter in the browser is limited to 100 MB per video to reduce memory use.");
  if((navigator.deviceMemory||4)<=2&&file.size>50*1024*1024)throw new Error("This video is too large for the available browser memory. Try a shorter clip.");
@@ -38,8 +38,10 @@ export async function separateVideoAudioFile(file,onProgress=null){
   }
   const vocals=ctx.createBuffer(2,total,rate),l=vocals.getChannelData(0),r=vocals.getChannelData(1);let offset=0;
   for(const part of parts){const n=part.length/2;for(let i=0;i<n;i++){l[offset+i]=part[2*i];r[offset+i]=part[2*i+1];}offset+=n;}
-  const blob=audioBufferToWav(vocals,true);
-  return {audioBuffer:vocals,blob,duration:vocals.duration,sampleRate:rate,audioSize:blob.size,format:"audio/wav"};
+  const blob=options.includeWav===false?null:audioBufferToWav(vocals,true);
+  const audioSize=blob?.size||0;
+  chunks.length=0;source=null;
+  return {audioBuffer:vocals,blob,duration:vocals.duration,sampleRate:rate,audioSize,format:"audio/wav"};
  }finally{if(worker)worker.terminate();if(ctx){try{await ctx.close();}catch(_){}}}
 }
 export async function recordVideoFromFile(file,audioBuffer=null,onProgress=null){
