@@ -1070,6 +1070,21 @@ export function renderResult(result, originalUrl) {
       downloadList.appendChild(pdfBtn);
     }
 
+    const hasVideoDownload = result.downloads.some((item) => {
+      const type = String(item.type || "").toUpperCase();
+      const url = String(item.url || "").toLowerCase();
+      return /VIDEO|MP4|WEBM|MOV|MKV|\b\d{3,4}P\b/.test(type) ||
+        /\.(mp4|webm|mov|mkv|m4v)(\?|#|$)/i.test(url) ||
+        /\.(m3u8|mpd)(\?|#|$)/i.test(url);
+    });
+    if (hasVideoDownload) {
+      const processingNote = document.createElement("p");
+      processingNote.className = "download-processing-note";
+      processingNote.textContent =
+        "After downloading a video, open Tools → Video to Audio to extract audio, create a silent video, or use Spleeter to keep vocals. These tools work with videos from all supported platforms.";
+      downloadList.appendChild(processingNote);
+    }
+
     result.downloads.forEach((dl, index) => {
       const btn = document.createElement("button");
       btn.className = "dl-item";
