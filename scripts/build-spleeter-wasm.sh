@@ -43,7 +43,6 @@ target_link_options(mori-spleeter-wasm PRIVATE
   "-sEXPORTED_RUNTIME_METHODS=['FS','HEAPF32','getValue','stringToUTF8','lengthBytesUTF8']"
 )
 set_target_properties(mori-spleeter-wasm PROPERTIES OUTPUT_NAME "mori-spleeter")
-install(TARGETS mori-spleeter-wasm DESTINATION bin/wasm/web)
 install(FILES
   "$<TARGET_FILE_DIR:mori-spleeter-wasm>/mori-spleeter.js"
   "$<TARGET_FILE_DIR:mori-spleeter-wasm>/mori-spleeter.wasm"
