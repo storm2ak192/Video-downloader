@@ -87,10 +87,8 @@ cmake -S "$SHERPA_ROOT" -B "$BUILD_ROOT/build" \
   -DSHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE=OFF
 
 cmake --build "$BUILD_ROOT/build" --target mori-spleeter-wasm --parallel 2
-cmake --install "$BUILD_ROOT/build"
-
-cp "$BUILD_ROOT/install/bin/wasm/web/mori-spleeter.js" "$OUTPUT_DIR/"
-cp "$BUILD_ROOT/install/bin/wasm/web/mori-spleeter.wasm" "$OUTPUT_DIR/"
+cp "$BUILD_ROOT/build/bin/mori-spleeter.js" "$OUTPUT_DIR/"
+cp "$BUILD_ROOT/build/bin/mori-spleeter.wasm" "$OUTPUT_DIR/"
 test -s "$OUTPUT_DIR/mori-spleeter.js"
 test -s "$OUTPUT_DIR/mori-spleeter.wasm"
 echo "Mori Spleeter WebAssembly runtime is ready in $OUTPUT_DIR"
