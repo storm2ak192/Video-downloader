@@ -28,20 +28,28 @@ function decodeSnapSave(data) {
   }
 }
 
-function resolveSnapSaveUrl(value) {
-  if (!value) return "";
-  let raw = String(value).trim().replace(/^["'\\]+|["'\\]+$/g, "");
-  if (raw.startsWith("//")) return "https:" + raw;
-  if (raw.startsWith("/")) return SNAP_SAVE + raw;
-  if (!/^https?:\/\//i.test(raw) && raw.includes(".")) {
+function extractFinalUrl(input) {
+  if (!input) return null;
+  let raw = String(input).trim().replace(/^["'\\]+|["'\\]+$/g, "");
+  let isRender = false;
+  if (raw.includes("get_progressApi") || raw.includes("get_progress")) {
+    isRender = true;
+    const tokenMatch = raw.match(/token=([^&'"]+)/);
+    if (tokenMatch) raw = tokenMatch[1];
+  }
+  if (raw.includes(".") && !raw.startsWith("http")) {
     try {
-      const payload = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-      const parsed = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
-      if (parsed.video_url) return parsed.video_url;
-      if (parsed.url) return parsed.url;
+      const payloadPart = raw.split(".")[1];
+      if (payloadPart) {
+        const payload = JSON.parse(Buffer.from(payloadPart.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+        if (payload.video_url) return { url: payload.video_url, isRender: true };
+        if (payload.url) return { url: payload.url, isRender: false };
+      }
     } catch {}
   }
-  return raw;
+  if (raw.startsWith("//")) return { url: "https:" + raw, isRender };
+  if (raw.startsWith("/")) return { url: SNAP_SAVE + raw, isRender };
+  return { url: raw, isRender };
 }
 
 function cookieHeader(headers) {
@@ -122,21 +130,15 @@ export default async function handler(req, res) {
     const downloads = [];
     const seen = new Set();
 
-    const addDownload = (candidate, label, render = false) => {
-      const finalUrl = resolveSnapSaveUrl(candidate);
-      if (!finalUrl || !/^https?:\/\//i.test(finalUrl) || seen.has(finalUrl)) return;
-      let parsed;
-      try { parsed = new URL(finalUrl); } catch { return; }
-      if (parsed.hostname === "snapsave.app" || parsed.hostname.endsWith(".snapsave.app")
-          || parsed.hostname === "facebook.com" || parsed.hostname.endsWith(".facebook.com")) return;
-      if (render || /get_progressApi|get_progress/i.test(String(candidate))) return;
+    const addDownload = (candidate, label) => {
+      const resolved = extractFinalUrl(candidate);
+      const finalUrl = resolved?.url;
+      if (!finalUrl || !/^https?:\/\//i.test(finalUrl) || resolved.isRender || seen.has(finalUrl)) return;
+      try { new URL(finalUrl); } catch { return; }
       seen.add(finalUrl);
-      const quality = String(label || "").replace(/\s+/g, " ").trim();
-      downloads.push({
-        type: "VIDEO",
-        quality: quality || (/\b(\d{3,4}p)\b/i.exec(finalUrl)?.[1] || "Video"),
-        url: finalUrl,
-      });
+      const quality = String(label || "").replace(/\s+/g, " ").trim()
+        || (/\b(\d{3,4}p)\b/i.exec(finalUrl)?.[1] || "VIDEO");
+      downloads.push({ type: quality, url: finalUrl });
     };
 
     $("table tbody tr").each((_, row) => {
@@ -146,7 +148,9 @@ export default async function handler(req, res) {
         || tr.find("td").first().text().trim()
         || tr.attr("data-quality")
         || "Video";
-      const link = tr.find("a.btn-download, a[href], button[onclick]").first();
+      let link = tr.find("a.btn-download").first();
+      if (!link.length) link = tr.find("button").first();
+      if (!link.length) link = tr.find("a").first();
       addDownload(link.attr("href") || link.attr("onclick") || link.attr("data-url"), quality);
     });
 
