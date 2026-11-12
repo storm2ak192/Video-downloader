@@ -915,7 +915,7 @@ downloadBtn.addEventListener("click", async () => {
       autoClearInputBox();
 
       // Auto Download Link if enabled
-      if (localStorage.getItem("mori_auto_download") === "true") {
+      if (localStorage.getItem("mori_auto_download") === "true" && !/(facebook\\.com|fb\\.watch)/i.test(url)) {
         setTimeout(() => {
           const dlBtn = document.querySelector(
             "#resultSection .dl-item, #resultSection .btn-download, #resultSection .dl-btn, #resultSection [data-url]",
