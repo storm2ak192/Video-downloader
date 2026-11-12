@@ -83,20 +83,8 @@ export function initBehaviorSettings() {
     });
   }
 
-  // Auto-Download Toggle
-  if (autoDownloadToggle) {
-    autoDownloadToggle.checked =
-      localStorage.getItem("mori_auto_download") === "true";
-    autoDownloadToggle.addEventListener("change", (e) => {
-      localStorage.setItem("mori_auto_download", e.target.checked);
-      const lang = translations[currentLang] || translations.en;
-      showToast(
-        e.target.checked
-          ? lang["toast-autodownload-on"] || "Auto-download enabled"
-          : lang["toast-autodownload-off"] || "Auto-download disabled",
-      );
-    });
-  }
+  // Automatic first-option downloads are intentionally disabled.
+  // Every platform now waits for the user to select a media item and quality.
 
   // Auto-Analyze Toggle
   const autoAnalyzeToggle = document.getElementById("autoAnalyzeToggle");
