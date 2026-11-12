@@ -4,7 +4,7 @@ const SNAP_SAVE = "https://snapsave.app";
 
 function decodeSnapSave(data) {
   try {
-    const regex = /eval\\(function\\(h,u,n,t,e,r\\)\\{.*?\\}\\("(.*?)",(\\d+),"(.*?)",(\\d+),(\\d+),(\\d+)\\)\\)/;
+    const regex = /eval\(function\(h,u,n,t,e,r\)\{.*?\}\("(.*?)",(\d+),"(.*?)",(\d+),(\d+),(\d+)\)\)/;
     const match = String(data).match(regex);
     if (!match) return String(data);
     const h = match[1];
@@ -30,10 +30,10 @@ function decodeSnapSave(data) {
 
 function resolveSnapSaveUrl(value) {
   if (!value) return "";
-  let raw = String(value).trim().replace(/^[\"'\\\\]+|[\"'\\\\]+$/g, "");
+  let raw = String(value).trim().replace(/^["'\\]+|["'\\]+$/g, "");
   if (raw.startsWith("//")) return "https:" + raw;
   if (raw.startsWith("/")) return SNAP_SAVE + raw;
-  if (!/^https?:\\/\\//i.test(raw) && raw.includes(".")) {
+  if (!/^https?:\/\//i.test(raw) && raw.includes(".")) {
     try {
       const payload = raw.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
       const parsed = JSON.parse(Buffer.from(payload, "base64").toString("utf8"));
@@ -124,17 +124,17 @@ export default async function handler(req, res) {
 
     const addDownload = (candidate, label, render = false) => {
       const finalUrl = resolveSnapSaveUrl(candidate);
-      if (!finalUrl || !/^https?:\\/\\//i.test(finalUrl) || seen.has(finalUrl)) return;
+      if (!finalUrl || !/^https?:\/\//i.test(finalUrl) || seen.has(finalUrl)) return;
       let parsed;
       try { parsed = new URL(finalUrl); } catch { return; }
       if (parsed.hostname === "snapsave.app" || parsed.hostname.endsWith(".snapsave.app")
           || parsed.hostname === "facebook.com" || parsed.hostname.endsWith(".facebook.com")) return;
       if (render || /get_progressApi|get_progress/i.test(String(candidate))) return;
       seen.add(finalUrl);
-      const quality = String(label || "").replace(/\\s+/g, " ").trim();
+      const quality = String(label || "").replace(/\s+/g, " ").trim();
       downloads.push({
         type: "VIDEO",
-        quality: quality || (/\\b(\\d{3,4}p)\\b/i.exec(finalUrl)?.[1] || "Video"),
+        quality: quality || (/\b(\d{3,4}p)\b/i.exec(finalUrl)?.[1] || "Video"),
         url: finalUrl,
       });
     };
