@@ -3196,25 +3196,18 @@
                   <label for="autoFolderToggle"></label>
                 </div>
               </div>
-              <!-- Auto-Download Link -->
+              <!-- Manual quality selection is always required for every platform -->
               <div class="settings-item">
                 <div class="item-label">
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="18"
-                    height="18"
-                    fill="currentColor"
-                  >
-                    <path
-                      d="M13 11.33L18 18H6l5-6.67V4h2v7.33zM12 2c-1.1 0-2 .9-2 2v7.33L5 18c-.67.89-.03 2.15 1.1 2.15h11.8c1.13 0 1.77-1.26 1.1-2.15L14 11.33V4c0-1.1-.9-2-2-2z"
-                    />
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h10v2H4z"/>
                   </svg>
-                  <span data-i18n="label-autodownload">Auto-Download Link</span>
+                  <div>
+                    <span>Manual Media Selection</span>
+                    <small class="dropzone-hint">Choose the format and quality before each download</small>
+                  </div>
                 </div>
-                <div class="toggle-switch">
-                  <input type="checkbox" id="autoDownloadToggle" />
-                  <label for="autoDownloadToggle"></label>
-                </div>
+                <span class="status-badge">ON</span>
               </div>
               <!-- Auto-Retry Download -->
               <div class="settings-item">
