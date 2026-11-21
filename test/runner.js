@@ -84,6 +84,7 @@ test("Vercel build configuration and browser WASM outputs are present", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
   const vercel = JSON.parse(fs.readFileSync(path.join(ROOT, "vercel.json"), "utf8"));
   assert.equal(pkg.scripts["build:web"], "npm test && bash scripts/build-spleeter-wasm.sh");
+  assert.equal(pkg.dependencies.axios, undefined, "unused vulnerable Axios must not be installed");
   assert.equal(vercel.outputDirectory, "public");
   assert.equal(vercel.buildCommand, "npm run build:web");
   assert.ok(fs.existsSync(path.join(ROOT, "wasm/spleeter/mori-spleeter-wasm.cc")));
