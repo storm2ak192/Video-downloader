@@ -51,13 +51,13 @@ function parseBody(body) {
 function copyRequestHeaders(input) {
   const allowed = new Set([
     "accept","accept-language","content-type","user-agent","referer","origin",
-    "x-requested-with","x-csrf-token","x-csrftoken","x-xsrf-token","x-ig-app-id",
+    "x-requested-with","x-csrf-token","x-csrftoken","x-xsrf-token","x-ig-app-id","cookie",
     "x-bili-mid","x-bili-aurora-eid","x-bili-aurora-exps","range",
   ]);
   const output = {};
   if (!input || typeof input !== "object") return output;
   for (const [key, value] of Object.entries(input)) {
-    if (allowed.has(key.toLowerCase()) && typeof value === "string" && value.length <= 2048) {
+    if (allowed.has(key.toLowerCase()) && typeof value === "string" && value.length <= (key.toLowerCase() === "cookie" ? 8192 : 2048)) {
       output[key] = value;
     }
   }
@@ -139,7 +139,12 @@ export default async function handler(req, res) {
       const location = response.headers.get("location");
       if (!location) break;
       if (hop === 5) throw new Error("Scraper redirect limit exceeded.");
+      const previousHost = target.hostname;
       target = validateTarget(new URL(location, target).toString());
+      if (target.hostname !== previousHost) {
+        delete headers.Cookie;
+        delete headers.cookie;
+      }
       if (response.status === 303 || ((response.status === 301 || response.status === 302) && currentMethod === "POST")) {
         currentMethod = "GET";
         currentBody = undefined;
