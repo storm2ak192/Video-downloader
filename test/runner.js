@@ -82,6 +82,20 @@ test("Facebook web scraping has a bundled-parser fallback", () => {
   assert.match(source, /\.scrapeFacebook\(url, \.\.\.args\)/);
 });
 
+test("legacy auto-download flags cannot bypass manual quality selection", () => {
+  const files = [
+    "public/js/app.js",
+    "public/js/modules/intents.js",
+    "public/js/modules/core.js",
+    "public/js/modules/settings/behavior.js",
+    "public/js/modules/download.js",
+  ];
+  for (const relativePath of files) {
+    const source = fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+    assert.doesNotMatch(source, /mori_auto_download|autoDownloadToggle/);
+  }
+});
+
 test("video results expose the four requested local processing choices", () => {
   const source = fs.readFileSync(path.join(ROOT, "public/js/ui/result.js"), "utf8");
   for (const label of ["original audio only", "vocals without music", "video with vocals", "silent video"]) {
