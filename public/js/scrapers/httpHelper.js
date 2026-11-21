@@ -293,7 +293,13 @@ export async function scraperFetch(options, serverName = "Server") {
       const binary = atob(responseData || "");
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      responseData = bytes.buffer;
+      if (options.responseType === "arraybuffer") {
+        responseData = bytes.buffer;
+      } else if (options.responseType === "blob") {
+        responseData = new Blob([bytes], { type: relayData.headers?.["content-type"] || "application/octet-stream" });
+      } else {
+        responseData = new TextDecoder().decode(bytes);
+      }
     }
     response = {
       status: relayData.status,
