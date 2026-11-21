@@ -3,3 +3,4 @@ Retry: regression expectation corrected.
 Axios removal and lockfile refresh.
 HTTPS relay and byte-safe response transport.
 Result page now exposes all four processing choices.
+Remove legacy auto-download path; retain manual quality choice.
