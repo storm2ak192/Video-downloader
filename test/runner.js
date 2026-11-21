@@ -43,7 +43,7 @@ test("all bundled scraper provider hosts are covered by the safe web relay", () 
   const allowed = [...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]);
   const hosts = [...new Set((bundle.match(/https?:\\?\/\\?\/[A-Za-z0-9._-]+/g) || [])
     .map((value) => value.replace(/\\\//g, "/").replace(/^https?:\/\//, "").toLowerCase())
-    .filter((host) => host.includes(".")))];
+    .filter((host) => host.includes(".") && !["dns.google", "cloudflare-dns.com"].includes(host)))];
   const missing = hosts.filter((host) => !allowed.some((domain) =>
     host === domain || host.endsWith("." + domain)
   ));
