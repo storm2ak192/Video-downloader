@@ -7,8 +7,6 @@ downloads/
 android/app/build
 android/.gradle
 bin/
-test/
-
 # Capacitor & Android Specs
 android/local.properties
 android/app/src/main/assets/public
