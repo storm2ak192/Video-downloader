@@ -7,7 +7,6 @@ import {
   triggerHaptic,
   showToast,
   stopAllMedia,
-  checkWifiOnlyGuard,
 } from "../utils/index.js";
 import {
   isBatchMode,
@@ -76,17 +75,8 @@ export async function handlePasteFromClipboard(isSilent = false) {
         const autoAnalyze =
           localStorage.getItem("mori_auto_analyze") === "true";
         if (autoAnalyze) {
+          // Automatically analyze only; the user must always choose a quality manually.
           setTimeout(() => downloadBtn?.click(), 300);
-        } else if (isSilent) {
-          const autoDownload =
-            localStorage.getItem("mori_auto_download") === "true";
-          if (autoDownload) {
-            // Wi-Fi check for auto-download
-            const canAuto = await checkWifiOnlyGuard();
-            if (canAuto) {
-              setTimeout(() => downloadBtn.click(), 500);
-            }
-          }
         }
       } else if (!isSilent) {
         showToast(translations[currentLang]["toast-no-link"]);
