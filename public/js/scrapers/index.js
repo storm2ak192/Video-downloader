@@ -22,7 +22,7 @@ const RELAY_HOSTS = [
   "youtube.com","youtu.be","ytmp3.gg","ytmp3.mobi","media.ytmp3.gg","convert1s.com",
   "twitter.com","x.com","fxtwitter.com","vxtwitter.com","twittervideodownloader.com","savetwt.com",
   "spotify.com","spotidown.app","spotimate.app","aplmate.com",
-  "pinterest.com","pin.it","pindown.io","facebook.com","fb.watch",
+  "pinterest.com","pin.it","pindown.io","instagram.com","facebook.com","fb.watch",
   "xiaohongshu.com","xhslink.com","xhslink.cn","rednote.com",
   "threads.com","threads.net","threadster.app",
   "bilibili.com","bilibili.tv","b23.tv","bili.im",
