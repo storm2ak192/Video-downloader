@@ -118,6 +118,14 @@ test("Vercel build configuration and browser WASM outputs are present", () => {
   assert.ok(fs.existsSync(path.join(ROOT, "scripts/build-spleeter-wasm.sh")));
 });
 
+test("WebAssembly build reuses cached source without requiring Git metadata", () => {
+  const source = fs.readFileSync(path.join(ROOT, "scripts/build-spleeter-wasm.sh"), "utf8");
+  assert.match(source, /! -f "\$EMSDK_ROOT\/emsdk"/);
+  assert.match(source, /! -f "\$SHERPA_ROOT\/CMakeLists\.txt"/);
+  assert.match(source, /rm -rf "\$EMSDK_ROOT"/);
+  assert.match(source, /rm -rf "\$SHERPA_ROOT"/);
+});
+
 test("the shell build script is syntactically valid", () => {
   const script = fs.readFileSync(path.join(ROOT, "scripts/build-spleeter-wasm.sh"), "utf8");
   const result = spawnSync("bash", ["-n"], { input: script, encoding: "utf8" });
