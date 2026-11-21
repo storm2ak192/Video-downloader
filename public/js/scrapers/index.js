@@ -40,6 +40,11 @@ function installBrowserScraperRelay() {
   );
 
   window.fetch = async (input, init = {}) => {
+    const isRequestInput = typeof Request !== "undefined" && input instanceof Request;
+    // Do not proxy ordinary media downloads or app fetches; scraperFetch always
+    // supplies its explicit User-Agent/header object.
+    if (!init.headers && !isRequestInput) return nativeFetch(input, init);
+
     const requestUrl = typeof input === "string" || input instanceof URL
       ? String(input)
       : input?.url;
