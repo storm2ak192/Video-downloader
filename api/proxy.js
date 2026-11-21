@@ -31,9 +31,9 @@ function isAllowedHost(hostname) {
 function validateTarget(value) {
   let target;
   try { target = new URL(value); } catch { throw new Error("Invalid scraper target URL."); }
-  if (!["http:", "https:"].includes(target.protocol)) throw new Error("Only HTTP(S) scraper URLs are allowed.");
+  if (target.protocol !== "https:") throw new Error("Only HTTPS scraper URLs are allowed.");
   if (target.username || target.password) throw new Error("Credentials in scraper URLs are not allowed.");
-  if (target.port && !((target.protocol === "https:" && target.port === "443") || (target.protocol === "http:" && target.port === "80"))) {
+  if (target.port && target.port !== "443") {
     throw new Error("Custom scraper URL ports are not allowed.");
   }
   if (!isAllowedHost(target.hostname)) throw new Error("This scraper host is not in Mori's safe allowlist: " + target.hostname);
@@ -158,12 +158,11 @@ export default async function handler(req, res) {
       const value = response.headers.get(name);
       if (value) headersOut[name] = value;
     }
-    const binary = payload.responseType === "arraybuffer";
     return res.status(200).json({
       status: response.status,
       headers: headersOut,
-      data: binary ? bytes.toString("base64") : bytes.toString("utf8"),
-      encoding: binary ? "base64" : "utf8",
+      data: bytes.toString("base64"),
+      encoding: "base64",
       url: response.url || target.toString(),
     });
   } catch (error) {
