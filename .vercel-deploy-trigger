@@ -5,3 +5,4 @@ HTTPS relay and byte-safe response transport.
 Result page now exposes all four processing choices.
 Remove legacy auto-download path; retain manual quality choice.
 Detect video result type even with HD/SD quality labels.
+Clarify original audio download in result options.
