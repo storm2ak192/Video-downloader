@@ -3,10 +3,10 @@
 // are reachable, redirects are revalidated, and response bodies are size-limited.
 const ALLOWED_HOSTS = [
   "tiktok.com","tikdownloader.io","tiktokio.com","snapsave.app","indown.net","savevid.net",
-  "youtube.com","youtu.be","ytmp3.gg","ytmp3.mobi","media.ytmp3.gg","convert1s.com","fastdl.to",
+  "youtube.com","youtu.be","ytmp3.gg","ytmp3.mobi","media.ytmp3.gg","convert1s.com","fastdl.to","ymcdn.org",
   "twitter.com","x.com","fxtwitter.com","vxtwitter.com","twittervideodownloader.com","savetwt.com",
   "spotify.com","spotidown.app","spotimate.app","aplmate.com",
-  "pinterest.com","pin.it","pindown.io",
+  "pinterest.com","pin.it","pindown.io","instagram.com",
   "facebook.com","fb.watch",
   "xiaohongshu.com","xhslink.com","xhslink.cn","rednote.com",
   "threads.com","threads.net","threadster.app",
