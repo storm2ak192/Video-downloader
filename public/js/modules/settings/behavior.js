@@ -15,7 +15,6 @@ import {
   autoPasteToggle,
   dataSaverToggle,
   wifiOnlyToggle,
-  autoDownloadToggle,
   autoPlayToggle,
   autoLoopToggle,
 } from "../core.js";
