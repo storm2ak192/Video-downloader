@@ -136,7 +136,6 @@ export const pathVal = document.getElementById("pathVal");
 export const changeMusicPathBtn = document.getElementById("changeMusicPathBtn");
 export const musicPathVal = document.getElementById("musicPathVal");
 export const wifiOnlyToggle = document.getElementById("wifiOnlyToggle");
-export const autoDownloadToggle = document.getElementById("autoDownloadToggle");
 export const filenameSelect = document.getElementById("filenameSelect");
 export const colorAccentSelect = document.getElementById("colorAccentSelect");
 export const fontSelect = document.getElementById("fontSelect");
