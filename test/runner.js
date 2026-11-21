@@ -38,16 +38,23 @@ test("first-party browser and server JavaScript parses", () => {
 test("all bundled scraper provider hosts are covered by the safe web relay", () => {
   const bundle = fs.readFileSync(path.join(ROOT, "public/js/scrapers/bundle.js"), "utf8");
   const proxy = fs.readFileSync(path.join(ROOT, "api/proxy.js"), "utf8");
+  const frontend = fs.readFileSync(path.join(ROOT, "public/js/scrapers/index.js"), "utf8");
   const match = proxy.match(/const ALLOWED_HOSTS = \[([\s\S]*?)\];/);
-  assert.ok(match, "proxy allowlist must exist");
+  const frontMatch = frontend.match(/const RELAY_HOSTS = \[([\s\S]*?)\];/);
+  assert.ok(match, "server proxy allowlist must exist");
+  assert.ok(frontMatch, "browser relay allowlist must exist");
   const allowed = [...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]);
+  const frontAllowed = [...frontMatch[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]);
   const hosts = [...new Set((bundle.match(/https?:\\?\/\\?\/[A-Za-z0-9._-]+/g) || [])
     .map((value) => value.replace(/\\\//g, "/").replace(/^https?:\/\//, "").toLowerCase())
     .filter((host) => host.includes(".") && !["dns.google", "cloudflare-dns.com"].includes(host)))];
-  const missing = hosts.filter((host) => !allowed.some((domain) =>
+  const isCovered = (host, domains) => domains.some((domain) =>
     host === domain || host.endsWith("." + domain)
-  ));
-  assert.deepEqual(missing, [], "Missing relay hosts: " + missing.join(", "));
+  );
+  const missingServer = hosts.filter((host) => !isCovered(host, allowed));
+  const missingBrowser = hosts.filter((host) => !isCovered(host, frontAllowed));
+  assert.deepEqual(missingServer, [], "Server proxy is missing: " + missingServer.join(", "));
+  assert.deepEqual(missingBrowser, [], "Browser relay is missing: " + missingBrowser.join(", "));
 });
 
 test("browser Spleeter releases the actual chunk buffer and not an undefined variable", () => {
@@ -63,7 +70,7 @@ test("browser scraper requests use the same-origin relay while native requests r
   assert.match(source, /installBrowserScraperRelay\(\)/);
   assert.match(source, /window\.Capacitor\?\.isNativePlatform\?\.\(\)/);
   assert.match(source, /\/api\/proxy/);
-  assert.match(source, /endsWith\("\." \+ domain\)/);
+  assert.match(source, /endsWith\("\." \+ domain\)/);\n  assert.match(source, /if \(!init\.headers && !isRequestInput\) return nativeFetch\(input, init\)/);
 });
 
 test("Facebook web scraping has a bundled-parser fallback", () => {
