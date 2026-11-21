@@ -8,7 +8,8 @@ EMSDK_ROOT="$BUILD_ROOT/emsdk"
 OUTPUT_DIR="$ROOT/public/wasm/spleeter"
 mkdir -p "$BUILD_ROOT" "$OUTPUT_DIR"
 
-if [ ! -d "$EMSDK_ROOT/.git" ]; then
+if [ ! -f "$EMSDK_ROOT/emsdk" ] || [ ! -f "$EMSDK_ROOT/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" ]; then
+  rm -rf "$EMSDK_ROOT"
   git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$EMSDK_ROOT"
 fi
 (
@@ -19,7 +20,8 @@ fi
 # shellcheck disable=SC1091
 source "$EMSDK_ROOT/emsdk_env.sh"
 
-if [ ! -d "$SHERPA_ROOT/.git" ]; then
+if [ ! -f "$SHERPA_ROOT/CMakeLists.txt" ] || [ ! -f "$SHERPA_ROOT/wasm/web/CMakeLists.txt" ]; then
+  rm -rf "$SHERPA_ROOT"
   git clone --depth 1 --branch v2.0.1 https://github.com/k2-fsa/sherpa-onnx.git "$SHERPA_ROOT"
 fi
 
