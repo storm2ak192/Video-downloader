@@ -830,7 +830,7 @@ downloadBtn.addEventListener("click", async () => {
       data = await scrapePinterest(url);
     } else if (url.includes("music.apple.com")) {
       data = await scrapeAppleMusic(url);
-    } else if (url.includes("facebook.com") || url.includes("fb.watch") || /(?:^|[/.])fb\\.com(?:[/?#:]|$)/i.test(url)) {
+    } else if (url.includes("facebook.com") || url.includes("fb.watch") || /(?:^|[/.])fb\.com(?:[/?#:]|$)/i.test(url)) {
       data = await scrapeFacebook(url);
     } else if (
       url.includes("xiaohongshu.com") ||
