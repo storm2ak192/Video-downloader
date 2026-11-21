@@ -224,7 +224,8 @@ export async function scraperFetch(options, serverName = "Server") {
     }
     if (response && !response.url) response.url = options.url;
   } else {
-    // Standard browser fetch fallback
+    // Browser builds route scraper metadata requests through Mori's same-origin,
+    // host-allowlisted Vercel function. Native Android/iOS requests stay direct.
     let fetchUrl = options.url;
     if (options.params) {
       const q = new URLSearchParams(options.params).toString();
@@ -238,47 +239,67 @@ export async function scraperFetch(options, serverName = "Server") {
         !(options.data instanceof FormData) &&
         !(options.data instanceof URLSearchParams)
       ) {
-        if (
-          headers["Content-Type"]?.includes("application/x-www-form-urlencoded")
-        ) {
+        if (headers["Content-Type"]?.includes("application/x-www-form-urlencoded")) {
           body = new URLSearchParams(options.data).toString();
         } else {
           body = JSON.stringify(options.data);
-          if (!headers["Content-Type"])
-            headers["Content-Type"] = "application/json";
+          if (!headers["Content-Type"]) headers["Content-Type"] = "application/json";
         }
       } else {
-        body = options.data;
+        body = options.data instanceof URLSearchParams
+          ? options.data.toString()
+          : options.data;
       }
     }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), getRequestTimeout());
-    const res = await fetch(fetchUrl, {
-      method,
-      headers,
-      body,
-      redirect: options.redirect || "follow",
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    const resData =
-      options.responseType === "arraybuffer"
-        ? await res.arrayBuffer()
-        : await res.text();
-    const headersObj = Object.fromEntries(res.headers.entries());
-    if (typeof res.headers.getSetCookie === "function") {
-      const allCookies = res.headers.getSetCookie();
-      if (allCookies && allCookies.length > 0) {
-        headersObj["set-cookie"] = allCookies.join("\n");
+    let relay;
+    try {
+      relay = await fetch("/api/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          url: fetchUrl,
+          method,
+          headers,
+          body: body === undefined ? null : String(body),
+          responseType: options.responseType || null,
+        }),
+        cache: "no-store",
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw new Error(`${serverName} request timed out after ${getRequestTimeout() / 1000}s`);
       }
+      throw new Error(`${serverName} could not reach Mori's secure web relay: ${error?.message || "Network error"}`);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    let relayData;
+    try {
+      relayData = await relay.json();
+    } catch {
+      throw new Error(`${serverName} relay returned an invalid response (HTTP ${relay.status}).`);
+    }
+    if (!relay.ok || !relayData || relayData.error) {
+      throw new Error(relayData?.error || `${serverName} relay failed (HTTP ${relay.status}).`);
+    }
+
+    let responseData = relayData.data;
+    if (relayData.encoding === "base64") {
+      const binary = atob(responseData || "");
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      responseData = bytes.buffer;
     }
     response = {
-      status: res.status,
-      headers: headersObj,
-      data: resData,
-      url: res.url,
+      status: relayData.status,
+      headers: relayData.headers || {},
+      data: responseData,
+      url: relayData.url || fetchUrl,
     };
   }
 
