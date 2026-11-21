@@ -1075,7 +1075,7 @@ export function renderResult(result, originalUrl) {
     selectionHeading.textContent = "Choose a format or quality (" + result.downloads.length + " option(s))";
     downloadList.appendChild(selectionHeading);
 
-    const hasVideoDownload = result.downloads.some((item) => {
+    const hasVideoDownload = String(result.type || "").toLowerCase() === "video" || result.downloads.some((item) => {
       const type = String(item.type || "").toUpperCase();
       const url = String(item.url || "").toLowerCase();
       return /VIDEO|MP4|WEBM|MOV|MKV|\b\d{3,4}P\b/.test(type) ||
