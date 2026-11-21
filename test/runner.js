@@ -70,7 +70,8 @@ test("browser scraper requests use the same-origin relay while native requests r
   assert.match(source, /installBrowserScraperRelay\(\)/);
   assert.match(source, /window\.Capacitor\?\.isNativePlatform\?\.\(\)/);
   assert.match(source, /\/api\/proxy/);
-  assert.match(source, /endsWith\("\." \+ domain\)/);\n  assert.match(source, /if \(!init\.headers && !isRequestInput\) return nativeFetch\(input, init\)/);
+  assert.match(source, /endsWith\("\." \+ domain\)/);
+  assert.match(source, /if \(!init\.headers && !isRequestInput\) return nativeFetch\(input, init\)/);
 });
 
 test("Facebook web scraping has a bundled-parser fallback", () => {
