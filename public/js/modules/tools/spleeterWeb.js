@@ -40,7 +40,7 @@ export async function separateVideoAudioFile(file,onProgress=null,options={}){
   for(const part of parts){const n=part.length/2;for(let i=0;i<n;i++){l[offset+i]=part[2*i];r[offset+i]=part[2*i+1];}offset+=n;}
   const blob=options.includeWav===false?null:audioBufferToWav(vocals,true);
   const audioSize=blob?.size||0;
-  chunks.length=0;source=null;
+  parts.length=0;source=null;
   return {audioBuffer:vocals,blob,duration:vocals.duration,sampleRate:rate,audioSize,format:"audio/wav"};
  }finally{if(worker)worker.terminate();if(ctx){try{await ctx.close();}catch(_){}}}
 }
