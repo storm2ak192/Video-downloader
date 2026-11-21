@@ -19,7 +19,7 @@ window.__moriDeps = { utils, urlUtils, core };
 // The native app keeps using Capacitor HTTP and is not affected by this wrapper.
 const RELAY_HOSTS = [
   "tiktok.com","tikdownloader.io","tiktokio.com","snapsave.app","indown.net","savevid.net","fastdl.to",
-  "youtube.com","youtu.be","ytmp3.gg","ytmp3.mobi","media.ytmp3.gg","convert1s.com",
+  "youtube.com","youtu.be","ytimg.com","ytmp3.gg","ytmp3.mobi","media.ytmp3.gg","convert1s.com",
   "twitter.com","x.com","fxtwitter.com","vxtwitter.com","twittervideodownloader.com","savetwt.com",
   "spotify.com","spotidown.app","spotimate.app","aplmate.com",
   "pinterest.com","pin.it","pindown.io","instagram.com","facebook.com","fb.watch",
