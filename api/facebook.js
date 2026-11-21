@@ -62,7 +62,7 @@ function cookieHeader(headers) {
 function isFacebookUrl(value) {
   try {
     const host = new URL(value).hostname.toLowerCase();
-    return ["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com", "fb.watch"].includes(host)
+    return ["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com", "fb.watch", "fb.com", "www.fb.com"].includes(host)
       || host.endsWith(".facebook.com");
   } catch {
     return false;
