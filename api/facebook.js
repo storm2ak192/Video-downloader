@@ -80,14 +80,15 @@ export default async function handler(req, res) {
 
   const origin = req.headers.origin;
   const host = req.headers.host;
-  if (origin) {
-    try {
-      if (new URL(origin).host !== host) {
-        return res.status(403).json({ status: false, message: "Cross-origin requests are not allowed." });
-      }
-    } catch {
-      return res.status(403).json({ status: false, message: "Invalid request origin." });
+  if (!origin) {
+    return res.status(403).json({ status: false, message: "A same-origin browser request is required." });
+  }
+  try {
+    if (new URL(origin).host !== host) {
+      return res.status(403).json({ status: false, message: "Cross-origin requests are not allowed." });
     }
+  } catch {
+    return res.status(403).json({ status: false, message: "Invalid request origin." });
   }
 
   const inputUrl = typeof req.body?.url === "string" ? req.body.url.trim() : "";
