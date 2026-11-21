@@ -43,6 +43,8 @@ test("all bundled scraper provider hosts are covered by the safe web relay", () 
   const frontMatch = frontend.match(/const RELAY_HOSTS = \[([\s\S]*?)\];/);
   assert.ok(match, "server proxy allowlist must exist");
   assert.ok(frontMatch, "browser relay allowlist must exist");
+  assert.match(proxy, /target\.protocol !== "https:"/);
+  assert.match(proxy, /encoding: "base64"/);
   const allowed = [...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]);
   const frontAllowed = [...frontMatch[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]);
   const hosts = [...new Set((bundle.match(/https?:\\?\/\\?\/[A-Za-z0-9._-]+/g) || [])
