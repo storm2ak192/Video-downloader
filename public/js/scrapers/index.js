@@ -15,6 +15,103 @@ window.__MORI_BUNDLED_SCRAPER_VERSION__ = BUNDLED_SCRAPER_VERSION;
 // Expose deps to the bundled IIFE core
 window.__moriDeps = { utils, urlUtils, core };
 
+// Route browser-only scraper traffic through Mori's same-origin safe relay.
+// The native app keeps using Capacitor HTTP and is not affected by this wrapper.
+const RELAY_HOSTS = [
+  "tiktok.com","tikdownloader.io","tiktokio.com","snapsave.app","indown.net","savevid.net","fastdl.to",
+  "youtube.com","youtu.be","ytmp3.gg","ytmp3.mobi","media.ytmp3.gg","convert1s.com",
+  "twitter.com","x.com","fxtwitter.com","vxtwitter.com","twittervideodownloader.com","savetwt.com",
+  "spotify.com","spotidown.app","spotimate.app","aplmate.com",
+  "pinterest.com","pin.it","pindown.io","facebook.com","fb.watch",
+  "xiaohongshu.com","xhslink.com","xhslink.cn","rednote.com",
+  "threads.com","threads.net","threadster.app",
+  "bilibili.com","bilibili.tv","b23.tv","bili.im",
+  "douyin.com","iesdouyin.com","snssdk.com",
+  "bandcamp.com","bandcampdownloader.app","pixiv.net","pximg.net","pixiv.re","ugoira.com",
+  "reddit.com","redd.it","rapidsave.com",
+  "terabox.com","teraboxapp.com","1024tera.com","nephobox.com","4funbox.com","mirrobox.com","momerybox.com","tibibox.com","sechno.com",
+];
+
+function installBrowserScraperRelay() {
+  if (window.Capacitor?.isNativePlatform?.() || window.__moriBrowserRelayInstalled) return;
+  const nativeFetch = window.fetch.bind(window);
+  const isRelayHost = (hostname) => RELAY_HOSTS.some((domain) =>
+    hostname === domain || hostname.endsWith("." + domain)
+  );
+
+  window.fetch = async (input, init = {}) => {
+    const requestUrl = typeof input === "string" || input instanceof URL
+      ? String(input)
+      : input?.url;
+    if (!requestUrl) return nativeFetch(input, init);
+
+    let target;
+    try { target = new URL(requestUrl, window.location.href); }
+    catch { return nativeFetch(input, init); }
+
+    if (target.origin === window.location.origin || !isRelayHost(target.hostname)) {
+      return nativeFetch(input, init);
+    }
+
+    const requestObject = typeof Request !== "undefined" && input instanceof Request
+      ? input.clone()
+      : null;
+    const method = String(init.method || requestObject?.method || "GET").toUpperCase();
+    const headers = new Headers(requestObject?.headers || undefined);
+    if (init.headers) new Headers(init.headers).forEach((value, key) => headers.set(key, value));
+
+    let body = init.body;
+    if (body == null && requestObject && method !== "GET" && method !== "HEAD") {
+      body = await requestObject.text();
+    }
+    if (body instanceof URLSearchParams) body = body.toString();
+    if (body instanceof FormData) {
+      throw new TypeError("FormData scraper requests are not supported by the secure web relay.");
+    }
+    if (body != null && typeof body !== "string") body = String(body);
+
+    const relayResponse = await nativeFetch("/api/proxy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({
+        url: target.toString(),
+        method,
+        headers: Object.fromEntries(headers.entries()),
+        body: body == null ? null : body,
+        responseType: null,
+      }),
+      cache: "no-store",
+      signal: init.signal || requestObject?.signal,
+    });
+
+    let payload;
+    try { payload = await relayResponse.json(); }
+    catch { throw new TypeError("Mori's secure scraper relay returned an invalid response."); }
+    if (!relayResponse.ok || payload?.error) {
+      throw new TypeError(payload?.error || "Mori's secure scraper relay failed.");
+    }
+
+    let responseBody = payload?.data ?? "";
+    if (payload?.encoding === "base64") {
+      const binary = atob(responseBody);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      responseBody = bytes;
+    }
+    const status = Number(payload?.status || 200);
+    const response = new Response(
+      method === "HEAD" || status === 204 || status === 205 || status === 304 ? null : responseBody,
+      { status, headers: payload?.headers || {} },
+    );
+    try { Object.defineProperty(response, "url", { value: payload?.url || target.toString() }); } catch {}
+    return response;
+  };
+
+  window.__moriBrowserRelayInstalled = true;
+}
+
+installBrowserScraperRelay();
+
 let _corePromise = null;
 
 async function fetchBundleText() {
