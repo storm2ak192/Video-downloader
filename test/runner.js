@@ -82,6 +82,15 @@ test("Facebook web scraping has a bundled-parser fallback", () => {
   assert.match(source, /\.scrapeFacebook\(url, \.\.\.args\)/);
 });
 
+test("video results expose the four requested local processing choices", () => {
+  const source = fs.readFileSync(path.join(ROOT, "public/js/ui/result.js"), "utf8");
+  for (const label of ["original audio only", "vocals without music", "video with vocals", "silent video"]) {
+    assert.ok(source.toLowerCase().includes(label), "Missing processing option: " + label);
+  }
+  assert.match(source, /nav-item\[data-page="tools"\]/);
+  assert.match(source, /download-processing-open/);
+});
+
 test("Vercel build configuration and browser WASM outputs are present", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
   const vercel = JSON.parse(fs.readFileSync(path.join(ROOT, "vercel.json"), "utf8"));
