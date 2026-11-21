@@ -104,6 +104,7 @@ test("video results expose the four requested local processing choices", () => {
   assert.match(source, /nav-item\[data-page="tools"\]/);
   assert.match(source, /download-processing-open/);
   assert.match(source, /String\(result\.type \|\| ""\)\.toLowerCase\(\) === "video"/);
+  assert.match(source, /original video with its original audio/);
 });
 
 test("Vercel build configuration and browser WASM outputs are present", () => {
