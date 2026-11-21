@@ -275,10 +275,30 @@ export async function scrapeThreads(...args) { return (await loadCoreScrapers())
 export async function scrapePinterest(...args) { return (await loadCoreScrapers()).scrapePinterest(...args); }
 export async function scrapeAppleMusic(...args) { return (await loadCoreScrapers()).scrapeAppleMusic(...args); }
 export async function scrapeFacebook(url, ...args) {
-  // Browsers cannot make SnapSave's cross-origin form requests directly.
-  // The Vercel function performs only this fixed Facebook -> SnapSave resolution.
   if (!window.Capacitor?.isNativePlatform?.()) {
-    return scrapeFacebookWeb(url);
+    // First use the server-side resolver, then retry with Mori's bundled parser.
+    // Both paths now share the same allowlisted relay for provider requests.
+    const primary = await scrapeFacebookWeb(url);
+    if (primary?.status) return primary;
+    try {
+      const fallback = await (await loadCoreScrapers()).scrapeFacebook(url, ...args);
+      if (fallback?.status) return fallback;
+      return {
+        status: false,
+        message: [
+          primary?.message ? "Server resolver: " + primary.message : "",
+          fallback?.message ? "Fallback resolver: " + fallback.message : "",
+        ].filter(Boolean).join(" | ") || "Could not analyze this Facebook link.",
+      };
+    } catch (error) {
+      return {
+        status: false,
+        message: [
+          primary?.message ? "Server resolver: " + primary.message : "",
+          "Fallback resolver: " + (error?.message || "failed"),
+        ].filter(Boolean).join(" | "),
+      };
+    }
   }
   return (await loadCoreScrapers()).scrapeFacebook(url, ...args);
 }
