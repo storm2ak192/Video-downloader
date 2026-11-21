@@ -396,11 +396,10 @@ document.addEventListener(
   { passive: true },
 );
 
-// Initial Auto-Paste & Auto-Download Check on App Open
+// Initial Auto-Paste Check on App Open
 setTimeout(() => {
   const autoPaste = localStorage.getItem("mori_auto_paste") !== "false";
-  const autoDownload = localStorage.getItem("mori_auto_download") === "true";
-  if (autoPaste || autoDownload) {
+  if (autoPaste) {
     if (typeof handlePasteFromClipboard === "function") {
       handlePasteFromClipboard(true);
     }
