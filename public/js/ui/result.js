@@ -1086,8 +1086,8 @@ export function renderResult(result, originalUrl) {
       const processingNote = document.createElement("p");
       processingNote.className = "download-processing-note";
       processingNote.textContent = currentLang === "ar"
-        ? "بعد تنزيل الفيديو، افتح أدوات المعالجة للوصول إلى: استخراج الصوت الأصلي فقط، أو استخراج الأصوات دون الموسيقى، أو إنشاء فيديو بالأصوات فقط، أو إنشاء فيديو صامت بحذف الصوت بالكامل. تعمل هذه الأدوات مع الفيديوهات المحمّلة من جميع المنصات المدعومة."
-        : "After downloading this video, open the processing tools to choose: original audio only, vocals without music, video with vocals and no music, or a completely silent video. These tools work with videos downloaded from all supported platforms.";
+        ? "اختيار أي جودة من القائمة أدناه ينزّل الفيديو بصوته الأصلي. وبعد التنزيل افتح أدوات المعالجة للوصول إلى: استخراج الصوت الأصلي فقط، أو استخراج الأصوات دون الموسيقى، أو إنشاء فيديو بالأصوات فقط، أو إنشاء فيديو صامت بحذف الصوت بالكامل. تعمل هذه الأدوات مع الفيديوهات المحمّلة من جميع المنصات المدعومة."
+        : "Choose any quality below to download the original video with its original audio. After that, open the processing tools to choose: original audio only, vocals without music, video with vocals and no music, or a completely silent video. These tools work with videos downloaded from all supported platforms.";
       downloadList.appendChild(processingNote);
 
       const openToolsBtn = document.createElement("button");
